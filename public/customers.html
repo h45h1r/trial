@@ -1,0 +1,31 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Customers — Fox & Fable WMS</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/base.css"></head>
+<body><script src="/nav.js"></script><script>renderNav('customers')</script>
+  <div class="page"><div class="hdr"><h1>Customers</h1><button class="btn btn-dark" onclick="openCreate()">+ New Customer</button></div>
+    <div class="controls"><input type="text" id="search" placeholder="Search customers..." /></div>
+    <div class="tw"><table><thead><tr><th>Company</th><th>Type</th><th>Contact</th><th>Region</th><th>Terms</th><th class="r">Credit Limit</th><th class="r">Credit Used</th><th>Discount</th><th class="r">Orders</th><th class="r">Spend</th></tr></thead>
+    <tbody id="tb"><tr><td colspan="10" class="empty">Loading...</td></tr></tbody></table></div></div>
+  <div id="mr"></div>
+  <script>
+    const rb=r=>r==='uk'?'<span class="badge b-uk">UK</span>':r==='us'?'<span class="badge b-us">US</span>':r==='eu'?'<span class="badge b-eu">EU</span>':'—';
+    async function load(){const q=document.getElementById('search').value;const d=await fetch(`/api/customers${q?'?search='+encodeURIComponent(q):''}`).then(r=>r.json());
+      if(!d.length){document.getElementById('tb').innerHTML='<tr><td colspan="10" class="empty">No customers</td></tr>';return}
+      document.getElementById('tb').innerHTML=d.map(c=>{const tp=c.customer_type||'retail';const tpc=tp==='distributor'?'background:#f3e8ff;color:#7c3aed':tp==='wholesale'?'background:#dbeafe;color:#1d4ed8':'background:#f1f5f9;color:#64748b';const terms=(c.payment_terms||'prepaid').replace('net-','Net ');const cl=Number(c.credit_limit_gbp)||0;const cu=Number(c.credit_used_gbp)||0;const disc=Number(c.default_discount_pct)||0;return`<tr><td style="font-weight:500">${esc(c.company_name)}</td><td><span class="badge" style="${tpc}">${tp}</span></td><td>${esc(c.contact_name||'')}</td><td>${rb(c.region)}</td><td style="font-size:.75rem">${terms}</td><td class="r">${cl>0?'£'+cl.toLocaleString():'—'}</td><td class="r" style="color:${cu>cl*0.8?'#dc2626':cu>0?'#d97706':'#94a3b8'}">${cu>0?'£'+cu.toLocaleString():'—'}</td><td class="r">${disc>0?disc+'%':'—'}</td><td class="r">${c.order_count}</td><td class="r">£${Number(c.total_spend_gbp).toFixed(2)}</td></tr>`}).join('')}
+    function openCreate(){document.getElementById('mr').innerHTML=`<div class="overlay" onclick="closeM(event)"><div class="modal" onclick="event.stopPropagation()"><h3>New Customer</h3>
+      <div class="field"><label>Company Name *</label><input id="cn"/></div><div class="field"><label>Contact Name</label><input id="cc"/></div><div class="field"><label>Email</label><input id="ce" type="email"/></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+      <div class="field"><label>Region</label><select id="cr"><option value="">—</option><option value="uk">UK</option><option value="us">US</option><option value="eu">EU</option></select></div>
+      <div class="field"><label>Account Type</label><select id="ct"><option value="retail">Retail</option><option value="wholesale">Wholesale</option><option value="distributor">Distributor</option></select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+      <div class="field"><label>Payment Terms</label><select id="cterms"><option value="prepaid">Prepaid</option><option value="net-15">Net 15</option><option value="net-30">Net 30</option><option value="net-60">Net 60</option><option value="net-90">Net 90</option></select></div>
+      <div class="field"><label>Credit Limit (£)</label><input id="clim" type="number" value="0" min="0"/></div>
+      </div>
+      <div class="field"><label>Default Discount (%)</label><input id="cdisc" type="number" value="0" min="0" max="50" step="0.5"/></div>
+      <div class="field"><label>Billing Address</label><textarea id="ca"></textarea></div><div class="field"><label>VAT Number</label><input id="cv"/></div>
+      <div class="actions"><button class="btn btn-ghost" onclick="closeM()">Cancel</button><button class="btn btn-dark" onclick="create()">Create</button></div></div></div>`}
+    async function create(){const n=document.getElementById('cn').value;if(!n)return alert('Company name required');
+      await fetch('/api/customers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({companyName:n,contactName:document.getElementById('cc').value,email:document.getElementById('ce').value,region:document.getElementById('cr').value,billingAddress:document.getElementById('ca').value,vatNumber:document.getElementById('cv').value,customerType:document.getElementById('ct').value,paymentTerms:document.getElementById('cterms').value,creditLimitGbp:Number(document.getElementById('clim').value)||0,defaultDiscountPct:Number(document.getElementById('cdisc').value)||0})});closeM();load()}
+    function closeM(e){if(e&&e.target!==e.currentTarget)return;document.getElementById('mr').innerHTML=''}
+    function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+    document.getElementById('search').addEventListener('input',load);load();
+  </script></body></html>

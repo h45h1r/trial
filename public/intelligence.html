@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Intelligence — Fox & Fable WMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/base.css">
+  <style>
+    .section { margin-bottom: 2rem; }
+    .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+    .section-head h2 { font-size: 1.0625rem; font-weight: 700; letter-spacing: -.01em; }
+    .section-head .tag { font-size: .625rem; font-weight: 600; padding: .125rem .5rem; border-radius: 4px; text-transform: uppercase; letter-spacing: .04em; }
+    .tag-feat { background: #dbeafe; color: #1d4ed8; }
+
+    /* Router */
+    .router-form { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.25rem; }
+    .router-row { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 1rem; }
+    .router-field label { display: block; font-size: .75rem; font-weight: 500; color: #475569; margin-bottom: .25rem; }
+    .router-field select, .router-field input { padding: .4375rem .75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: .8125rem; font-family: inherit; background: #fff; }
+    .router-field select:focus, .router-field input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
+    .product-picks { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+    .product-pick { display: inline-flex; align-items: center; gap: .375rem; padding: .25rem .5rem .25rem .625rem; background: #f1f5f9; border-radius: 5px; font-size: .75rem; }
+    .product-pick .rm { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: .8125rem; padding: 0 .125rem; }
+    .product-pick .rm:hover { color: #ef4444; }
+    .route-results { margin-top: 1rem; }
+    .route-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: .5rem; display: grid; grid-template-columns: auto 1fr auto; gap: 1rem; align-items: center; }
+    .route-card.recommended { border-color: #22c55e; background: #f0fdf4; }
+    .route-rank { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .8125rem; background: #f1f5f9; color: #64748b; }
+    .route-card.recommended .route-rank { background: #22c55e; color: #fff; }
+    .route-name { font-weight: 600; font-size: .875rem; }
+    .route-meta { font-size: .6875rem; color: #64748b; margin-top: .125rem; }
+    .route-warns { margin-top: .375rem; }
+    .route-warn { font-size: .6875rem; color: #d97706; display: flex; align-items: center; gap: .25rem; }
+    .route-score { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .route-score-label { font-size: .6875rem; color: #94a3b8; }
+    .breakdown { display: flex; gap: .375rem; flex-wrap: wrap; margin-top: .25rem; }
+    .breakdown span { font-size: .5625rem; padding: .1rem .375rem; border-radius: 3px; background: #f1f5f9; color: #475569; }
+    .breakdown span.pos { background: #dcfce7; color: #15803d; }
+    .breakdown span.neg { background: #fee2e2; color: #b91c1c; }
+
+    /* Stockout */
+    .pred-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-bottom: 1rem; background: #e2e8f0; border-radius: 8px; overflow: hidden; }
+    .pred-stat { padding: .875rem 1.25rem; background: #fff; }
+    .pred-stat.crit { background: #fef2f2; }
+    .pred-stat.warn { background: #fffbeb; }
+    .pred-stat-label { font-size: .625rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: .25rem; }
+    .pred-stat-val { font-size: 1.375rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .pred-stat.crit .pred-stat-val { color: #dc2626; }
+    .pred-stat.warn .pred-stat-val { color: #d97706; }
+    .sev-crit { background: #fef2f2; color: #dc2626; }
+    .sev-warning { background: #fffbeb; color: #d97706; }
+    .sev-healthy { background: #f0fdf4; color: #16a34a; }
+    .sev-no_demand { background: #f1f5f9; color: #94a3b8; }
+
+    /* Reorder */
+    .reorder-controls { display: flex; gap: .75rem; align-items: center; margin-bottom: 1rem; }
+    .supplier-group { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: .75rem; }
+    .supplier-head { padding: 1rem 1.25rem; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; }
+    .supplier-name { font-weight: 600; font-size: .9375rem; }
+    .supplier-meta { font-size: .6875rem; color: #64748b; margin-top: .125rem; }
+    .supplier-cost { text-align: right; }
+    .supplier-cost-val { font-size: 1.125rem; font-weight: 700; }
+    .supplier-cost-label { font-size: .6875rem; color: #94a3b8; }
+    .urgency-badge { display: inline-block; font-size: .5625rem; font-weight: 600; padding: .1rem .375rem; border-radius: 3px; text-transform: uppercase; letter-spacing: .03em; }
+    .urg-critical { background: #fef2f2; color: #dc2626; }
+    .urg-urgent { background: #fffbeb; color: #d97706; }
+    .urg-reorder { background: #dbeafe; color: #1d4ed8; }
+    .urg-preventive { background: #f1f5f9; color: #64748b; }
+    .gen-po-btn { padding: .375rem .875rem; background: #0f172a; color: #fff; border: none; border-radius: 6px; font-size: .75rem; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .gen-po-btn:hover { background: #1e293b; }
+    .gen-po-btn:disabled { opacity: .4; cursor: default; }
+    .gen-po-btn.done { background: #16a34a; }
+
+    @media(max-width:768px){ .pred-stats{grid-template-columns:repeat(2,1fr)} .route-card{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script><script>renderNav('intelligence')</script>
+  <div class="page">
+    <div class="hdr">
+      <h1>Intelligence</h1>
+      <span style="font-size:.75rem;color:#94a3b8">Decision support &amp; analytics</span>
+    </div>
+
+    <!-- Section 1: Order Routing -->
+    <div class="section">
+      <div class="section-head">
+        <h2>Order Routing Simulator</h2>
+        <span class="tag tag-feat">Routing</span>
+      </div>
+      <div class="router-form">
+        <div class="router-row">
+          <div class="router-field">
+            <label>Customer</label>
+            <select id="routeCustomer" onchange="onRouteCustomerChange()"><option value="">Select customer...</option></select>
+          </div>
+          <div class="router-field">
+            <label>Add Product</label>
+            <select id="routeProduct"><option value="">Select product...</option></select>
+          </div>
+          <div class="router-field">
+            <label>Qty</label>
+            <input type="number" id="routeQty" value="1" min="1" style="width:70px" />
+          </div>
+          <button class="btn btn-dark btn-sm" onclick="addRouteProduct()">Add</button>
+          <button class="btn btn-dark" onclick="calculateRoute()" id="routeBtn" disabled>Calculate Route</button>
+        </div>
+        <div class="product-picks" id="routePicks"><span style="font-size:.75rem;color:#94a3b8">Add products above to simulate routing</span></div>
+        <div class="route-results" id="routeResults"></div>
+      </div>
+    </div>
+
+    <!-- Section 2: Stockout Predictions -->
+    <div class="section">
+      <div class="section-head">
+        <h2>Stockout Predictions</h2>
+        <span class="tag tag-feat">Forecast</span>
+      </div>
+      <div class="pred-stats" id="predStats"></div>
+      <div class="controls" style="margin-bottom:.75rem">
+        <select id="predWh" onchange="renderPredictions()">
+          <option value="">All warehouses</option>
+          <option value="uk">London (UK)</option>
+          <option value="us">Charleston (US)</option>
+          <option value="eu">Hanover (DE)</option>
+        </select>
+        <select id="predSev" onchange="renderPredictions()">
+          <option value="">All severities</option>
+          <option value="critical">Critical (&lt;14 days)</option>
+          <option value="warning">Warning (&lt;30 days)</option>
+          <option value="healthy">Healthy</option>
+        </select>
+        <span class="summary" id="predCount"></span>
+      </div>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Severity</th><th>Product</th><th>SKU</th><th>Warehouse</th><th class="r">Stock</th><th class="r">Burn/day</th><th class="r">Days Left</th><th>Supplier</th><th class="r">Lead Time</th></tr></thead>
+          <tbody id="predBody"><tr><td colspan="9" class="empty">Loading predictions...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section 3: Smart Reorder -->
+    <div class="section">
+      <div class="section-head">
+        <h2>Smart Reorder Recommendations</h2>
+        <span class="tag tag-feat">Demand</span>
+      </div>
+      <div class="reorder-controls">
+        <select id="reorderWh" onchange="loadReorder()">
+          <option value="uk">London (UK)</option>
+          <option value="us">Charleston (US)</option>
+          <option value="eu">Hanover (DE)</option>
+        </select>
+        <span class="summary" id="reorderSummary"></span>
+      </div>
+      <div id="reorderGroups"><div class="empty" style="background:#fff;border:1px solid #e2e8f0;border-radius:8px">Loading recommendations...</div></div>
+    </div>
+  </div>
+  <script>
+    let customers=[], products=[], predictions=[], routeItems=[];
+    const WN={uk:'London (UK)',us:'Charleston (US)',eu:'Hanover (DE)'};
+
+    async function init(){
+      const [c,p]=await Promise.all([
+        fetch('/api/customers').then(r=>r.json()),
+        fetch('/api/products').then(r=>r.json()),
+      ]);
+      customers=c; products=p;
+      const cs=document.getElementById('routeCustomer');
+      customers.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.company_name+(c.region?' ('+c.region.toUpperCase()+')':'');cs.appendChild(o)});
+      const ps=document.getElementById('routeProduct');
+      products.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.brand+' — '+p.name;ps.appendChild(o)});
+      loadPredictions();
+      loadReorder();
+    }
+
+    // ── Routing ──
+    function onRouteCustomerChange(){ document.getElementById('routeBtn').disabled=!document.getElementById('routeCustomer').value||!routeItems.length }
+    function addRouteProduct(){
+      const sel=document.getElementById('routeProduct');
+      const pid=sel.value;if(!pid)return;
+      const qty=parseInt(document.getElementById('routeQty').value)||1;
+      const prod=products.find(p=>p.id===pid);if(!prod)return;
+      const existing=routeItems.find(r=>r.id===pid);
+      if(existing){existing.qty+=qty}else{routeItems.push({id:pid,name:prod.name,sku:prod.sku,qty})}
+      renderRoutePicks();
+      document.getElementById('routeBtn').disabled=!document.getElementById('routeCustomer').value||!routeItems.length;
+    }
+    function removeRouteProduct(id){routeItems=routeItems.filter(r=>r.id!==id);renderRoutePicks();document.getElementById('routeBtn').disabled=!routeItems.length}
+    function renderRoutePicks(){
+      if(!routeItems.length){document.getElementById('routePicks').innerHTML='<span style="font-size:.75rem;color:#94a3b8">Add products above to simulate routing</span>';return}
+      document.getElementById('routePicks').innerHTML=routeItems.map(r=>`<div class="product-pick"><span style="font-weight:500">${esc(r.name)}</span><span style="color:#64748b">&times;${r.qty}</span><button class="rm" onclick="removeRouteProduct('${r.id}')">&times;</button></div>`).join('');
+    }
+    async function calculateRoute(){
+      const cid=document.getElementById('routeCustomer').value;
+      if(!cid||!routeItems.length)return;
+      document.getElementById('routeBtn').textContent='Calculating...';document.getElementById('routeBtn').disabled=true;
+      const pids=routeItems.map(r=>r.id).join(',');
+      const qtys=routeItems.map(r=>r.qty).join(',');
+      const data=await fetch(`/api/intelligence/route-order?customerId=${cid}&productIds=${pids}&qtys=${qtys}`).then(r=>r.json());
+      document.getElementById('routeBtn').textContent='Calculate Route';document.getElementById('routeBtn').disabled=false;
+      renderRouteResults(data);
+    }
+    function renderRouteResults(data){
+      document.getElementById('routeResults').innerHTML=`
+        <div style="font-size:.75rem;color:#64748b;margin-bottom:.75rem">Customer region: <strong>${(data.customerRegion||'uk').toUpperCase()}</strong> · Preferred: <strong>${WN[data.preferredWarehouse]||data.preferredWarehouse}</strong></div>
+        ${data.options.map((o,i)=>{
+          const rec=o.warehouse===data.recommended;
+          return `<div class="route-card${rec?' recommended':''}">
+            <div class="route-rank">${rec?'&#10003;':i+1}</div>
+            <div>
+              <div class="route-name">${o.warehouseName}${rec?' — Recommended':''}</div>
+              <div class="route-meta">${o.canFulfill?'Can fulfill all items':'Cannot fulfill all items'}</div>
+              <div class="breakdown">${o.breakdown.map(b=>`<span class="${b.points>0?'pos':'neg'}">${b.factor}: ${b.points>0?'+':''}${b.points}</span>`).join('')}</div>
+              ${o.warnings.length?'<div class="route-warns">'+o.warnings.map(w=>'<div class="route-warn">&#9888; '+esc(w)+'</div>').join('')+'</div>':''}
+            </div>
+            <div style="text-align:right">
+              <div class="route-score">${o.score}</div>
+              <div class="route-score-label">score</div>
+            </div>
+          </div>`;
+        }).join('')}`;
+    }
+
+    // ── Stockout Predictions ──
+    async function loadPredictions(){
+      predictions=await fetch('/api/intelligence/stockout-predictions').then(r=>r.json());
+      const crit=predictions.filter(p=>p.severity==='critical').length;
+      const warn=predictions.filter(p=>p.severity==='warning').length;
+      const healthy=predictions.filter(p=>p.severity==='healthy').length;
+      const noDemand=predictions.filter(p=>p.severity==='no_demand').length;
+      document.getElementById('predStats').innerHTML=
+        `<div class="pred-stat crit"><div class="pred-stat-label">Critical (&lt;14d)</div><div class="pred-stat-val">${crit}</div></div>`+
+        `<div class="pred-stat warn"><div class="pred-stat-label">Warning (&lt;30d)</div><div class="pred-stat-val">${warn}</div></div>`+
+        `<div class="pred-stat"><div class="pred-stat-label">Healthy</div><div class="pred-stat-val">${healthy}</div></div>`+
+        `<div class="pred-stat"><div class="pred-stat-label">No Demand Data</div><div class="pred-stat-val">${noDemand}</div></div>`;
+      renderPredictions();
+    }
+    function renderPredictions(){
+      const wh=document.getElementById('predWh').value;
+      const sev=document.getElementById('predSev').value;
+      let filtered=predictions.filter(p=>p.severity!=='no_demand');
+      if(wh)filtered=filtered.filter(p=>p.warehouse===wh);
+      if(sev)filtered=filtered.filter(p=>p.severity===sev);
+      document.getElementById('predCount').textContent=filtered.length+' products';
+      if(!filtered.length){document.getElementById('predBody').innerHTML='<tr><td colspan="9" class="empty">No matching predictions</td></tr>';return}
+      document.getElementById('predBody').innerHTML=filtered.slice(0,50).map(p=>{
+        const daysLeft=p.days_until_stockout!==null?Number(p.days_until_stockout).toFixed(1):'—';
+        const burnRate=Number(p.burn_rate_per_day);
+        return `<tr>
+          <td><span class="badge sev-${p.severity}">${p.severity}</span></td>
+          <td style="font-weight:500">${esc(p.name)}</td>
+          <td class="mono">${esc(p.sku)}</td>
+          <td><span class="badge b-${p.warehouse}">${p.warehouse.toUpperCase()}</span></td>
+          <td class="r">${p.qty_on_hand}</td>
+          <td class="r">${burnRate>0?burnRate.toFixed(2):'—'}</td>
+          <td class="r" style="font-weight:600;color:${p.severity==='critical'?'#dc2626':p.severity==='warning'?'#d97706':'#16a34a'}">${daysLeft}</td>
+          <td style="font-size:.75rem;color:#64748b">${esc(p.supplier_name||'—')}</td>
+          <td class="r">${p.lead_time_days||'—'}d</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ── Reorder Recommendations ──
+    async function loadReorder(){
+      const wh=document.getElementById('reorderWh').value;
+      const data=await fetch('/api/intelligence/reorder-recommendations?warehouseCode='+wh).then(r=>r.json());
+      document.getElementById('reorderSummary').textContent=`${data.totalSuppliers} supplier${data.totalSuppliers!==1?'s':''} · ${data.totalProducts} products need reorder`;
+      if(!data.suppliers.length){
+        document.getElementById('reorderGroups').innerHTML='<div class="empty" style="background:#fff;border:1px solid #e2e8f0;border-radius:8px">All stock levels are healthy for this warehouse</div>';
+        return;
+      }
+      document.getElementById('reorderGroups').innerHTML=data.suppliers.map(s=>`
+        <div class="supplier-group">
+          <div class="supplier-head">
+            <div>
+              <div class="supplier-name">${esc(s.supplierName)}</div>
+              <div class="supplier-meta">Lead time: ${s.leadTimeDays}d · ${s.totalItems} products · ${s.supplierCurrency}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:1rem">
+              <div class="supplier-cost">
+                <div class="supplier-cost-val">£${s.totalCost.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+                <div class="supplier-cost-label">estimated cost</div>
+              </div>
+              <button class="gen-po-btn" id="po-${s.supplierId}" onclick="generatePO('${s.supplierId}','${esc(s.supplierName)}','${wh}',this)">Generate PO</button>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>Urgency</th><th>Product</th><th>SKU</th><th class="r">Stock</th><th class="r">Reorder Pt</th><th class="r">Burn/day</th><th class="r">Days Left</th><th class="r">Rec. Qty</th><th class="r">Est. Cost</th></tr></thead>
+            <tbody>
+              ${s.products.map(p=>`<tr>
+                <td><span class="urgency-badge urg-${p.urgency}">${p.urgency}</span></td>
+                <td style="font-weight:500;font-size:.75rem">${esc(p.name)}</td>
+                <td class="mono">${esc(p.sku)}</td>
+                <td class="r">${p.currentStock}</td>
+                <td class="r" style="color:#94a3b8">${p.reorderPoint}</td>
+                <td class="r">${p.burnRatePerDay>0?p.burnRatePerDay.toFixed(2):'—'}</td>
+                <td class="r" style="font-weight:600;color:${p.urgency==='critical'?'#dc2626':p.urgency==='urgent'?'#d97706':'#64748b'}">${p.daysUntilStockout!==null?Number(p.daysUntilStockout).toFixed(1):'—'}</td>
+                <td class="r" style="font-weight:600">${p.recommendedQty}</td>
+                <td class="r">£${p.estimatedCost.toFixed(2)}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      `).join('');
+    }
+
+    async function generatePO(supplierId, supplierName, warehouseCode, btn){
+      if(!confirm(`Generate a draft PO for ${supplierName} at ${WN[warehouseCode]||warehouseCode}?`))return;
+      btn.disabled=true;btn.textContent='Creating...';
+      const wh=document.getElementById('reorderWh').value;
+      const data=await fetch('/api/intelligence/reorder-recommendations?warehouseCode='+wh).then(r=>r.json());
+      const supplier=data.suppliers.find(s=>s.supplierId===supplierId);
+      if(!supplier){btn.textContent='Error';return}
+      const body={
+        supplierId,
+        warehouseCode,
+        notes:`Reorder: ${supplier.totalItems} items, demand-based quantities`,
+        lines:supplier.products.map(p=>({productId:p.productId,qtyOrdered:p.recommendedQty,unitCost:p.costPerUnit}))
+      };
+      const r=await fetch('/api/purchase-orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      const po=await r.json();
+      if(r.ok){
+        btn.textContent='PO Created ✓';btn.className='gen-po-btn done';
+        btn.onclick=null;
+      }else{
+        btn.textContent='Error';btn.disabled=false;
+        alert('Failed: '+(po.error||'unknown error'));
+      }
+    }
+
+    function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+    init();
+  </script>
+</body>
+</html>

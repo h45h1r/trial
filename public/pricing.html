@@ -1,0 +1,22 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Pricing — Fox & Fable WMS</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/base.css">
+  <style>.rate-cards{display:flex;gap:.75rem;margin-bottom:1.5rem}.rate-card{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:.875rem 1.25rem}.rate-l{font-size:.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8}.rate-v{font-size:1.375rem;font-weight:700;margin-top:.125rem;font-variant-numeric:tabular-nums}
+    .m-high{color:#16a34a;font-weight:600}.m-mid{color:#d97706;font-weight:600}.m-low{color:#dc2626;font-weight:600}
+    th.gbp{background:#eff6ff}th.usd{background:#fdf4ff}th.eur{background:#f0fdf4}td.gbp{background:#f8fbff}td.usd{background:#fefaff}td.eur{background:#f8fdf9}</style></head>
+<body><script src="/nav.js"></script><script>renderNav('pricing')</script>
+  <div class="page"><h1 style="margin-bottom:.25rem">Multi-Currency Pricing</h1><p style="font-size:.8125rem;color:#94a3b8;margin-bottom:1.25rem">GBP base prices converted at current rates</p>
+    <div class="rate-cards" id="rates"></div>
+    <div class="controls"><input type="text" id="search" placeholder="Search products..."/><select id="bf"><option value="">All Brands</option></select></div>
+    <div class="tw" style="overflow-x:auto"><table><thead><tr><th>Brand</th><th>Product</th><th>SKU</th><th class="r gbp">Cost (£)</th><th class="r gbp">Sell (£)</th><th class="r usd">Cost ($)</th><th class="r usd">Sell ($)</th><th class="r eur">Cost (€)</th><th class="r eur">Sell (€)</th><th class="r">Margin</th></tr></thead>
+    <tbody id="tb"><tr><td colspan="10" class="empty">Loading...</td></tr></tbody></table></div></div>
+  <script>
+    let all=[],rates={};
+    async function init(){const r=await fetch('/api/pricing').then(r=>r.json());rates=r.rates;all=r.products;
+      document.getElementById('rates').innerHTML=`<div class="rate-card"><div class="rate-l">GBP → USD</div><div class="rate-v">${rates.gbpUsd}</div></div><div class="rate-card"><div class="rate-l">GBP → EUR</div><div class="rate-v">${rates.gbpEur}</div></div><div class="rate-card"><div class="rate-l">Products</div><div class="rate-v">${all.length}</div></div>`;
+      const brands=[...new Set(all.map(p=>p.brand))].sort();const sel=document.getElementById('bf');brands.forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b;sel.appendChild(o)});render()}
+    function render(){const q=document.getElementById('search').value.toLowerCase(),b=document.getElementById('bf').value;
+      const f=all.filter(p=>{if(q&&!p.name.toLowerCase().includes(q)&&!p.sku.toLowerCase().includes(q)&&!p.brand.toLowerCase().includes(q))return false;if(b&&p.brand!==b)return false;return true});
+      document.getElementById('tb').innerHTML=f.map(p=>{const m=Number(p.margin_pct)||0;const mc=m>=40?'m-high':m>=25?'m-mid':'m-low';
+        return `<tr><td style="font-weight:500;color:#475569">${esc(p.brand)}</td><td>${esc(p.name)}</td><td class="mono">${p.sku}</td><td class="r gbp">£${N(p.cost_price_gbp)}</td><td class="r gbp">£${N(p.sell_price_gbp)}</td><td class="r usd">$${N(p.cost_usd)}</td><td class="r usd">$${N(p.sell_usd)}</td><td class="r eur">€${N(p.cost_eur)}</td><td class="r eur">€${N(p.sell_eur)}</td><td class="r ${mc}">${m}%</td></tr>`}).join('')}
+    function N(v){return Number(v).toFixed(2)}function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+    document.getElementById('search').addEventListener('input',render);document.getElementById('bf').addEventListener('change',render);init();
+  </script></body></html>

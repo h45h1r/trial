@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cycle Counts — Fox & Fable WMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/base.css">
+  <style>
+    .count-card{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1rem 1.25rem;margin-bottom:.5rem;cursor:pointer;transition:border-color 120ms}
+    .count-card:hover{border-color:#cbd5e1}
+    .count-card.active{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.08)}
+    .cc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}
+    .cc-ref{font-weight:600;font-size:.875rem}
+    .cc-scope{font-size:.6875rem;color:#64748b}
+    .cc-stats{display:flex;gap:1rem;font-size:.75rem;color:#94a3b8}
+    .cc-stats strong{color:#0f172a;font-weight:600}
+    .b-planned{background:#f1f5f9;color:#475569}
+    .b-in_progress{background:#fffbeb;color:#a16207}
+    .b-completed{background:#f0fdf4;color:#15803d}
+    .b-cancelled{background:#fef2f2;color:#b91c1c}
+    .detail{background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden}
+    .detail-head{padding:1rem 1.25rem;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between}
+    .detail-head h2{font-size:.9375rem;font-weight:600}
+    .detail-actions{display:flex;gap:.5rem}
+    .progress-bar{height:4px;background:#f1f5f9;border-radius:2px;margin:0 1.25rem 1rem}
+    .progress-fill{height:100%;background:#22c55e;border-radius:2px;transition:width 300ms}
+    .line-row{display:grid;grid-template-columns:80px 1fr 100px 80px 80px 80px 120px;gap:.5rem;align-items:center;padding:.5rem 1.25rem;border-bottom:1px solid #f8fafc;font-size:.8125rem}
+    .line-row.head{font-size:.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;border-bottom:1px solid #e2e8f0;background:#fafbfc}
+    .line-loc{font-family:ui-monospace,monospace;font-size:.6875rem;color:#64748b}
+    .line-var{font-weight:600;font-variant-numeric:tabular-nums}
+    .line-var.pos{color:#16a34a}.line-var.neg{color:#dc2626}.line-var.zero{color:#94a3b8}
+    .count-input{width:70px;padding:.25rem .5rem;border:1px solid #e2e8f0;border-radius:4px;font-size:.8125rem;font-family:inherit;text-align:right}
+    .count-input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.1)}
+    .count-input.done{background:#f0fdf4;border-color:#bbf7d0}
+    .count-input.diff{background:#fef2f2;border-color:#fecaca}
+    .save-btn{padding:.1875rem .5rem;border-radius:4px;font-size:.6875rem;font-weight:500;cursor:pointer;border:none;background:#0f172a;color:#fff}
+    .save-btn:hover{background:#1e293b}
+    .save-btn:disabled{opacity:.4;cursor:default}
+    .layout{display:grid;grid-template-columns:340px 1fr;gap:1rem;align-items:start}
+    .disc-summary{display:flex;gap:.75rem;padding:.75rem 1.25rem;background:#fafbfc;border-bottom:1px solid #e2e8f0;font-size:.75rem;color:#64748b}
+    .disc-summary strong{color:#0f172a}
+    @media(max-width:1024px){.layout{grid-template-columns:1fr}.line-row{font-size:.75rem}}
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script><script>renderNav('cycle-counts')</script>
+  <div class="page">
+    <div class="hdr">
+      <h1>Cycle Counts</h1>
+      <button class="btn btn-dark" onclick="openNew()">New Cycle Count</button>
+    </div>
+    <div class="layout">
+      <div id="list"><div class="empty">Loading...</div></div>
+      <div id="detail"><div class="empty" style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:3rem">Select a cycle count to view details</div></div>
+    </div>
+  </div>
+  <div id="mr"></div>
+  <script>
+    let counts=[], activeId=null;
+    const WN={uk:'London · UK',us:'Charleston · US',eu:'Hanover · DE'};
+
+    async function loadList(){
+      counts=await fetch('/api/cycle-counts').then(r=>r.json());
+      renderList();
+    }
+
+    function renderList(){
+      if(!counts.length){document.getElementById('list').innerHTML='<div class="empty" style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:2rem">No cycle counts yet</div>';return}
+      document.getElementById('list').innerHTML=counts.map(c=>`
+        <div class="count-card${c.id===activeId?' active':''}" onclick="loadDetail('${c.id}')">
+          <div class="cc-top">
+            <span class="cc-ref">${esc(c.count_ref)}</span>
+            <span class="badge b-${c.status}">${c.status.replace('_',' ')}</span>
+          </div>
+          <div class="cc-scope">${WN[c.warehouse_code] || c.warehouse_code} · ${c.scope}${c.scope_filter ? ': '+esc(c.scope_filter) : ''}</div>
+          <div class="cc-stats">
+            <span>Items: <strong>${c.line_count}</strong></span>
+            <span>Counted: <strong>${c.counted_lines}/${c.line_count}</strong></span>
+            ${c.discrepancies > 0 ? `<span style="color:#dc2626">Discrepancies: <strong>${c.discrepancies}</strong></span>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function loadDetail(id){
+      activeId=id;
+      renderList();
+      const data=await fetch('/api/cycle-counts/'+id).then(r=>r.json());
+      renderDetail(data);
+    }
+
+    function renderDetail(cc){
+      const counted=cc.lines.filter(l=>l.counted_qty!==null).length;
+      const total=cc.lines.length;
+      const pct=total?Math.round((counted/total)*100):0;
+      const discs=cc.lines.filter(l=>l.counted_qty!==null&&l.counted_qty!==l.expected_qty).length;
+      const totalVar=cc.lines.reduce((s,l)=>s+Math.abs(l.variance||0),0);
+
+      const canStart=cc.status==='planned';
+      const canComplete=cc.status==='in_progress'&&counted===total;
+      const isActive=cc.status==='in_progress';
+
+      let actions='';
+      if(canStart) actions=`<button class="btn btn-dark" onclick="startCount('${cc.id}')">Start Count</button>`;
+      if(canComplete) actions=`<button class="btn btn-green" style="color:#fff" onclick="completeCount('${cc.id}')">Complete & Apply</button>`;
+
+      document.getElementById('detail').innerHTML=`
+        <div class="detail">
+          <div class="detail-head">
+            <div>
+              <h2>${esc(cc.count_ref)}</h2>
+              <div style="font-size:.75rem;color:#94a3b8;margin-top:.25rem">${WN[cc.warehouse_code]||cc.warehouse_code} · ${cc.scope} · ${counted}/${total} counted</div>
+            </div>
+            <div class="detail-actions">
+              <span class="badge b-${cc.status}" style="font-size:.75rem;padding:.25rem .625rem">${cc.status.replace('_',' ')}</span>
+              ${actions}
+            </div>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+          <div class="disc-summary">
+            <span>Progress: <strong>${pct}%</strong></span>
+            <span>Discrepancies: <strong>${discs}</strong></span>
+            <span>Total variance: <strong>${totalVar} units</strong></span>
+          </div>
+          <div class="line-row head">
+            <div>Location</div><div>Product</div><div>SKU</div><div style="text-align:right">Expected</div><div style="text-align:right">Counted</div><div style="text-align:right">Variance</div><div></div>
+          </div>
+          <div id="lines">${cc.lines.map(l=>renderLine(l,isActive)).join('')}</div>
+        </div>`;
+    }
+
+    function renderLine(l,isActive){
+      const hasCounted=l.counted_qty!==null;
+      const v=l.variance||0;
+      const vc=v>0?'pos':v<0?'neg':'zero';
+      const inputClass=hasCounted?(v!==0?'count-input diff':'count-input done'):'count-input';
+      return `<div class="line-row">
+        <div class="line-loc">${esc(l.location||'—')}</div>
+        <div style="font-weight:500">${esc(l.product_name)}</div>
+        <div style="font-family:ui-monospace,monospace;font-size:.75rem;color:#94a3b8">${esc(l.sku)}</div>
+        <div style="text-align:right;font-variant-numeric:tabular-nums">${l.expected_qty}</div>
+        <div style="text-align:right">${isActive?`<input type="number" class="${inputClass}" id="ci-${l.id}" value="${hasCounted?l.counted_qty:''}" min="0" />`:(hasCounted?l.counted_qty:'—')}</div>
+        <div style="text-align:right"><span class="line-var ${vc}">${hasCounted?(v>0?'+':'')+v:'—'}</span></div>
+        <div style="text-align:right">${isActive?`<button class="save-btn" onclick="recordLine('${l.id}')">Save</button>`:''}</div>
+      </div>`;
+    }
+
+    async function startCount(id){
+      await fetch('/api/cycle-counts/'+id+'/start',{method:'PATCH'});
+      await loadList();loadDetail(id);
+    }
+
+    async function recordLine(lineId){
+      const input=document.getElementById('ci-'+lineId);
+      if(!input||input.value==='')return;
+      await fetch('/api/cycle-count-lines/'+lineId+'/record',{
+        method:'PATCH',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({countedQty:parseInt(input.value)})
+      });
+      loadDetail(activeId);
+    }
+
+    async function completeCount(id){
+      if(!confirm('Complete this cycle count? Stock adjustments will be applied for all discrepancies.'))return;
+      const r=await fetch('/api/cycle-counts/'+id+'/complete',{method:'PATCH'}).then(r=>r.json());
+      alert(`Cycle count completed. ${r.adjustments} stock adjustment(s) applied.`);
+      await loadList();loadDetail(id);
+    }
+
+    function openNew(){
+      document.getElementById('mr').innerHTML=`<div class="overlay" onclick="closeM(event)"><div class="modal" onclick="event.stopPropagation()">
+        <h3>New Cycle Count</h3>
+        <div class="field"><label>Warehouse</label><select id="nw"><option value="uk">London (UK)</option><option value="us">Charleston (US)</option><option value="eu">Hanover (DE)</option></select></div>
+        <div class="field"><label>Scope</label><select id="ns" onchange="toggleScope()"><option value="full">Full count</option><option value="zone">Zone (by location prefix)</option><option value="brand">Brand</option><option value="random">Random sample (20 items)</option></select></div>
+        <div class="field" id="sf-wrap" style="display:none"><label id="sf-label">Filter</label><input type="text" id="sf" placeholder="" /></div>
+        <div class="field"><label>Planned Date</label><input type="date" id="nd" /></div>
+        <div class="field"><label>Notes</label><input type="text" id="nn" placeholder="Optional notes" /></div>
+        <div class="actions"><button class="btn btn-ghost" onclick="closeM()">Cancel</button><button class="btn btn-dark" onclick="createCount()">Create</button></div>
+      </div></div>`;
+    }
+
+    function toggleScope(){
+      const s=document.getElementById('ns').value;
+      const wrap=document.getElementById('sf-wrap');
+      const label=document.getElementById('sf-label');
+      const input=document.getElementById('sf');
+      if(s==='zone'){wrap.style.display='';label.textContent='Location prefix';input.placeholder='e.g. A or A-01'}
+      else if(s==='brand'){wrap.style.display='';label.textContent='Brand name';input.placeholder='e.g. Games Workshop'}
+      else{wrap.style.display='none'}
+    }
+
+    async function createCount(){
+      const body={warehouseCode:document.getElementById('nw').value,scope:document.getElementById('ns').value};
+      const sf=document.getElementById('sf')?.value?.trim();
+      if(sf)body.scopeFilter=sf;
+      const nd=document.getElementById('nd').value;
+      if(nd)body.plannedDate=nd;
+      const nn=document.getElementById('nn').value.trim();
+      if(nn)body.notes=nn;
+      const r=await fetch('/api/cycle-counts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
+      closeM();await loadList();loadDetail(r.id);
+    }
+
+    function closeM(e){if(e&&e.target!==e.currentTarget)return;document.getElementById('mr').innerHTML=''}
+    function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+    loadList();
+  </script>
+</body>
+</html>

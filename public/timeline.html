@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activity Timeline — Fox & Fable WMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/base.css">
+  <style>
+    .filters { display: flex; gap: .75rem; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .filters select { padding: .4375rem .75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: .8125rem; font-family: inherit; background: #fff; }
+    .filters select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
+    .filter-count { margin-left: auto; font-size: .75rem; color: #94a3b8; }
+
+    .day-group { margin-bottom: 1.5rem; }
+    .day-label { font-size: .6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: .75rem; padding-left: 44px; display: flex; align-items: center; gap: .5rem; }
+    .day-label::after { content: ''; flex: 1; height: 1px; background: #e2e8f0; }
+    .day-count { font-weight: 400; color: #cbd5e1; }
+
+    .tl { position: relative; padding-left: 44px; }
+    .tl::before { content: ''; position: absolute; left: 16px; top: 0; bottom: 0; width: 2px; background: #e2e8f0; }
+
+    .tl-item { position: relative; padding: .625rem 0; display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: start; }
+    .tl-item:last-child { padding-bottom: 0; }
+
+    .tl-dot { position: absolute; left: -32px; top: .75rem; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #e2e8f0; z-index: 1; }
+
+    .tl-body { min-width: 0; }
+    .tl-desc { font-size: .8125rem; line-height: 1.5; }
+    .tl-desc strong { font-weight: 600; }
+    .tl-desc a { color: #3b82f6; text-decoration: none; font-weight: 600; }
+    .tl-desc a:hover { text-decoration: underline; }
+    .tl-product { font-size: .6875rem; color: #94a3b8; margin-top: .125rem; }
+
+    .tl-right { display: flex; flex-direction: column; align-items: flex-end; gap: .25rem; flex-shrink: 0; }
+    .tl-time { font-size: .6875rem; color: #94a3b8; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .tl-tag { font-size: .5625rem; font-weight: 600; padding: .125rem .375rem; border-radius: 3px; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+    .tl-wh { font-size: .5625rem; font-weight: 600; padding: .1rem .375rem; border-radius: 3px; background: #f1f5f9; color: #64748b; text-transform: uppercase; letter-spacing: .03em; }
+    .tl-qty { font-size: .6875rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .tl-qty.pos { color: #16a34a; }
+    .tl-qty.neg { color: #dc2626; }
+
+    .empty-tl { text-align: center; padding: 3rem; color: #94a3b8; font-size: .8125rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script><script>renderNav('timeline')</script>
+  <div class="page">
+    <div class="hdr"><h1>Activity Timeline</h1></div>
+    <div class="filters">
+      <select id="whFilter" onchange="renderTimeline()">
+        <option value="">All warehouses</option>
+        <option value="uk">London (UK)</option>
+        <option value="us">Charleston (US)</option>
+        <option value="eu">Hanover (DE)</option>
+      </select>
+      <select id="catFilter" onchange="renderTimeline()">
+        <option value="">All categories</option>
+        <option value="stock">Stock movements</option>
+        <option value="orders">Orders</option>
+        <option value="po">Purchase orders</option>
+        <option value="transfers">Transfers</option>
+        <option value="returns">Returns</option>
+        <option value="other">Other</option>
+      </select>
+      <span class="filter-count" id="filterCount"></span>
+    </div>
+    <div id="timeline"><div class="empty-tl">Loading activity...</div></div>
+  </div>
+  <script>
+    const CATEGORIES = {
+      stock_received: 'stock', stock_shipped: 'stock', stock_adjusted: 'stock', stock_returned: 'stock', stock_written_off: 'stock',
+      stock_transferred_out: 'transfers', stock_transferred_in: 'transfers', transfer_created: 'transfers',
+      order_created: 'orders', order_pick: 'orders', order_pack: 'orders', order_ship: 'orders',
+      po_created: 'po', po_submitted: 'po', po_auto_created: 'po', po_received: 'po',
+      return_created: 'returns', return_processed: 'returns',
+      location_updated: 'other', cycle_count_created: 'other', cycle_count_completed: 'other',
+    };
+
+    const DOT_COLORS = {
+      stock_received: '#22c55e', stock_shipped: '#ef4444', stock_adjusted: '#8b5cf6', stock_returned: '#22c55e', stock_written_off: '#ef4444',
+      stock_transferred_out: '#f59e0b', stock_transferred_in: '#3b82f6', transfer_created: '#3b82f6',
+      order_created: '#3b82f6', order_pick: '#f59e0b', order_pack: '#8b5cf6', order_ship: '#22c55e',
+      po_created: '#3b82f6', po_submitted: '#3b82f6', po_auto_created: '#8b5cf6', po_received: '#22c55e',
+      return_created: '#f59e0b', return_processed: '#22c55e',
+      location_updated: '#94a3b8', cycle_count_created: '#06b6d4', cycle_count_completed: '#22c55e',
+    };
+
+    const TAG_STYLES = {
+      stock_received: 'background:#dcfce7;color:#15803d', stock_shipped: 'background:#fee2e2;color:#b91c1c',
+      stock_adjusted: 'background:#f3e8ff;color:#7c3aed', stock_returned: 'background:#dcfce7;color:#15803d',
+      stock_written_off: 'background:#fee2e2;color:#b91c1c',
+      stock_transferred_out: 'background:#fef3c7;color:#a16207', stock_transferred_in: 'background:#dbeafe;color:#1d4ed8',
+      transfer_created: 'background:#dbeafe;color:#1d4ed8',
+      order_created: 'background:#dbeafe;color:#1d4ed8', order_pick: 'background:#fef3c7;color:#a16207',
+      order_pack: 'background:#f3e8ff;color:#7c3aed', order_ship: 'background:#dcfce7;color:#15803d',
+      po_created: 'background:#dbeafe;color:#1d4ed8', po_submitted: 'background:#dbeafe;color:#1d4ed8',
+      po_auto_created: 'background:#f3e8ff;color:#7c3aed', po_received: 'background:#dcfce7;color:#15803d',
+      return_created: 'background:#fef3c7;color:#a16207', return_processed: 'background:#dcfce7;color:#15803d',
+      location_updated: 'background:#f1f5f9;color:#64748b',
+      cycle_count_created: 'background:#ecfeff;color:#0e7490', cycle_count_completed: 'background:#dcfce7;color:#15803d',
+    };
+
+    let allEntries = [];
+
+    async function load() {
+      allEntries = await fetch('/api/audit-log?limit=200').then(r => r.json());
+      renderTimeline();
+    }
+
+    function renderTimeline() {
+      const whF = document.getElementById('whFilter').value;
+      const catF = document.getElementById('catFilter').value;
+
+      let entries = allEntries;
+      if (whF) entries = entries.filter(e => e.warehouse_code === whF);
+      if (catF) entries = entries.filter(e => (CATEGORIES[e.action] || 'other') === catF);
+
+      document.getElementById('filterCount').textContent = entries.length + ' event' + (entries.length !== 1 ? 's' : '');
+
+      if (!entries.length) {
+        document.getElementById('timeline').innerHTML = '<div class="empty-tl">No matching activity</div>';
+        return;
+      }
+
+      // Group by day
+      const groups = {};
+      const today = new Date().toDateString();
+      const yesterday = new Date(Date.now() - 86400000).toDateString();
+
+      entries.forEach(e => {
+        const d = new Date(e.created_at);
+        const ds = d.toDateString();
+        const label = ds === today ? 'Today' : ds === yesterday ? 'Yesterday' : d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        if (!groups[label]) groups[label] = [];
+        groups[label].push(e);
+      });
+
+      let html = '';
+      for (const [label, items] of Object.entries(groups)) {
+        html += `<div class="day-group">
+          <div class="day-label">${label} <span class="day-count">${items.length}</span></div>
+          <div class="tl">${items.map(e => renderItem(e)).join('')}</div>
+        </div>`;
+      }
+      document.getElementById('timeline').innerHTML = html;
+    }
+
+    function renderItem(e) {
+      const t = new Date(e.created_at);
+      const time = t.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      const dotColor = DOT_COLORS[e.action] || '#94a3b8';
+      const tagStyle = TAG_STYLES[e.action] || 'background:#f1f5f9;color:#64748b';
+      const tagLabel = e.action.replace(/_/g, ' ');
+      const desc = buildDescription(e);
+      const qtyHtml = e.qty_change ? `<span class="tl-qty ${e.qty_change > 0 ? 'pos' : 'neg'}">${e.qty_change > 0 ? '+' : ''}${e.qty_change}</span>` : '';
+
+      return `<div class="tl-item">
+        <div class="tl-dot" style="background:${dotColor}"></div>
+        <div class="tl-body">
+          <div class="tl-desc">${desc}</div>
+          ${e.product_name ? '<div class="tl-product">' + esc(e.product_name) + (e.product_sku ? ' · ' + esc(e.product_sku) : '') + '</div>' : ''}
+        </div>
+        <div class="tl-right">
+          <span class="tl-time">${time}</span>
+          <span class="tl-tag" style="${tagStyle}">${tagLabel}</span>
+          ${e.warehouse_code ? '<span class="tl-wh">' + e.warehouse_code.toUpperCase() + '</span>' : ''}
+          ${qtyHtml}
+        </div>
+      </div>`;
+    }
+
+    function buildDescription(e) {
+      const notes = e.notes || '';
+      // Extract refs like PO-2026-0005, ORD-2026-0001, etc.
+      const refMatch = notes.match(/(PO-\d{4}-\d+)/);
+      const ordMatch = notes.match(/(ORD-\d{4}-\d+)/);
+      const txfMatch = notes.match(/(TXF-\d{4}-\d+)/);
+      const rmaMatch = notes.match(/(RMA-\d{4}-\d+)/);
+      const ccMatch = notes.match(/(CC-\d{4}-\d+)/);
+
+      let desc = esc(notes);
+
+      if (refMatch) desc = desc.replace(refMatch[1], `<a href="/purchase-orders.html">${refMatch[1]}</a>`);
+      if (ordMatch) desc = desc.replace(ordMatch[1], `<a href="/fulfilment.html">${ordMatch[1]}</a>`);
+      if (txfMatch) desc = desc.replace(txfMatch[1], `<a href="/transfers.html">${txfMatch[1]}</a>`);
+      if (rmaMatch) desc = desc.replace(rmaMatch[1], `<a href="/returns.html">${rmaMatch[1]}</a>`);
+      if (ccMatch) desc = desc.replace(ccMatch[1], `<a href="/cycle-counts.html">${ccMatch[1]}</a>`);
+
+      if (e.balance_after !== null && e.balance_after !== undefined) {
+        desc += ` <span style="color:#94a3b8;font-size:.6875rem">(balance: ${e.balance_after})</span>`;
+      }
+
+      return desc || '<span style="color:#94a3b8">No description</span>';
+    }
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    load();
+  </script>
+</body>
+</html>

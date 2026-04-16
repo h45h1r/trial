@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock Alerts — Fox & Fable WMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/base.css">
+  <style>
+    .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; margin-bottom: 1.5rem; background: #e2e8f0; border-radius: 8px; overflow: hidden; }
+    .stat { padding: 1rem 1.25rem; background: #fff; }
+    .stat.crit { background: #fef2f2; }
+    .stat-label { font-size: .625rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: .25rem; }
+    .stat.crit .stat-label { color: #b91c1c; }
+    .stat-val { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+    .stat.crit .stat-val { color: #dc2626; }
+    .stat-sub { font-size: .6875rem; color: #94a3b8; margin-top: .125rem; }
+
+    .wh-section { margin-bottom: 1.5rem; }
+    .wh-header { display: flex; align-items: center; gap: .75rem; margin-bottom: .75rem; }
+    .wh-title { font-size: .9375rem; font-weight: 600; }
+    .wh-count { font-size: .6875rem; font-weight: 600; padding: .125rem .5rem; border-radius: 4px; }
+    .wh-uk { background: #dbeafe; color: #1d4ed8; }
+    .wh-us { background: #fce7f3; color: #be185d; }
+    .wh-eu { background: #f0fdf4; color: #15803d; }
+
+    .alert-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: .875rem 1.25rem; margin-bottom: .5rem; display: grid; grid-template-columns: auto 1fr auto; gap: 1rem; align-items: center; }
+    .alert-card:hover { border-color: #cbd5e1; }
+    .alert-icon { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .875rem; font-weight: 700; flex-shrink: 0; }
+    .alert-icon.oos { background: #fef2f2; color: #dc2626; }
+    .alert-icon.low { background: #fffbeb; color: #d97706; }
+    .alert-info { min-width: 0; }
+    .alert-name { font-weight: 600; font-size: .8125rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .alert-meta { font-size: .6875rem; color: #94a3b8; margin-top: .125rem; display: flex; gap: .75rem; flex-wrap: wrap; }
+    .alert-meta strong { color: #475569; }
+    .alert-stock { display: flex; align-items: center; gap: .375rem; margin-top: .375rem; }
+    .alert-stock-bar { width: 60px; height: 4px; background: #f1f5f9; border-radius: 2px; overflow: hidden; }
+    .alert-stock-fill { height: 100%; border-radius: 2px; }
+    .alert-stock-text { font-size: .6875rem; font-variant-numeric: tabular-nums; color: #64748b; }
+
+    .alert-action { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: .375rem; }
+    .action-tag { font-size: .6875rem; font-weight: 500; padding: .25rem .625rem; border-radius: 5px; display: inline-flex; align-items: center; gap: .25rem; }
+    .action-transfer { background: #dbeafe; color: #1d4ed8; }
+    .action-reorder { background: #f3e8ff; color: #7c3aed; }
+    .action-btn { font-size: .6875rem; font-weight: 600; padding: .25rem .625rem; border-radius: 4px; border: 1px solid #e2e8f0; background: #fff; color: #475569; cursor: pointer; text-decoration: none; }
+    .action-btn:hover { background: #f8fafc; border-color: #cbd5e1; }
+
+    .empty-wh { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 2rem; text-align: center; color: #94a3b8; font-size: .8125rem; }
+
+    .filters { display: flex; gap: .75rem; align-items: center; margin-bottom: 1rem; }
+    .filters select, .filters input { padding: .4375rem .75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: .8125rem; font-family: inherit; background: #fff; }
+    .filters input { width: 240px; }
+    .filters input:focus, .filters select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
+
+    @media(max-width:768px) { .stats { grid-template-columns: repeat(2,1fr); } .alert-card { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script><script>renderNav('alerts')</script>
+  <div class="page">
+    <div class="hdr"><h1>Stock Alerts</h1><span style="font-size:.75rem;color:#94a3b8" id="ts"></span></div>
+    <div class="stats" id="stats"></div>
+    <div class="filters">
+      <input type="text" id="search" placeholder="Search product, SKU, brand..." oninput="renderAlerts()" />
+      <select id="typeFilter" onchange="renderAlerts()">
+        <option value="">All alerts</option>
+        <option value="out_of_stock">Out of stock only</option>
+        <option value="low_stock">Low stock only</option>
+      </select>
+      <select id="actionFilter" onchange="renderAlerts()">
+        <option value="">All actions</option>
+        <option value="transfer">Can transfer</option>
+        <option value="reorder">Need to reorder</option>
+      </select>
+    </div>
+    <div id="alerts"><div class="empty">Loading alerts...</div></div>
+  </div>
+  <script>
+    const WN = { uk: 'London', us: 'Charleston', eu: 'Hanover' };
+    const WC = { uk: 'wh-uk', us: 'wh-us', eu: 'wh-eu' };
+    let allAlerts = [];
+
+    async function load() {
+      allAlerts = await fetch('/api/alerts/low-stock').then(r => r.json());
+      const now = new Date();
+      document.getElementById('ts').textContent = 'Updated ' + now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+      const total = allAlerts.length;
+      const oos = allAlerts.filter(a => a.alert_type === 'out_of_stock').length;
+      const byWh = { uk: 0, us: 0, eu: 0 };
+      allAlerts.forEach(a => { byWh[a.warehouse] = (byWh[a.warehouse] || 0) + 1; });
+      const transferable = allAlerts.filter(a => a.surplus_elsewhere && a.surplus_elsewhere.length).length;
+
+      document.getElementById('stats').innerHTML =
+        stat('Total Alerts', total, 'Across all warehouses') +
+        stat('Out of Stock', oos, Math.round(oos / Math.max(total, 1) * 100) + '% of alerts', true) +
+        stat('UK Alerts', byWh.uk, WN.uk) +
+        stat('US Alerts', byWh.us, WN.us) +
+        stat('EU Alerts', byWh.eu, WN.eu);
+
+      renderAlerts();
+    }
+
+    function stat(label, val, sub, crit) {
+      return `<div class="stat${crit ? ' crit' : ''}"><div class="stat-label">${label}</div><div class="stat-val">${val}</div><div class="stat-sub">${sub}</div></div>`;
+    }
+
+    function renderAlerts() {
+      const q = document.getElementById('search').value.toLowerCase();
+      const typeF = document.getElementById('typeFilter').value;
+      const actionF = document.getElementById('actionFilter').value;
+
+      let filtered = allAlerts;
+      if (q) filtered = filtered.filter(a => a.name.toLowerCase().includes(q) || a.sku.toLowerCase().includes(q) || a.brand.toLowerCase().includes(q));
+      if (typeF) filtered = filtered.filter(a => a.alert_type === typeF);
+      if (actionF === 'transfer') filtered = filtered.filter(a => a.surplus_elsewhere && a.surplus_elsewhere.length);
+      if (actionF === 'reorder') filtered = filtered.filter(a => !a.surplus_elsewhere || !a.surplus_elsewhere.length);
+
+      const grouped = { uk: [], us: [], eu: [] };
+      filtered.forEach(a => { (grouped[a.warehouse] = grouped[a.warehouse] || []).push(a); });
+
+      let html = '';
+      for (const wh of ['uk', 'us', 'eu']) {
+        const items = grouped[wh] || [];
+        html += `<div class="wh-section">
+          <div class="wh-header">
+            <span class="wh-title">${WN[wh]}</span>
+            <span class="wh-count ${WC[wh]}">${items.length} alert${items.length !== 1 ? 's' : ''}</span>
+          </div>`;
+        if (!items.length) {
+          html += '<div class="empty-wh">No alerts for this warehouse</div>';
+        } else {
+          html += items.map(a => renderAlert(a)).join('');
+        }
+        html += '</div>';
+      }
+      document.getElementById('alerts').innerHTML = html;
+    }
+
+    function renderAlert(a) {
+      const oos = a.alert_type === 'out_of_stock';
+      const iconClass = oos ? 'oos' : 'low';
+      const iconText = oos ? '0' : a.qty_on_hand;
+      const rp = Math.max(a.reorder_point, 1);
+      const pct = Math.min(100, Math.round((a.qty_on_hand / rp) * 100));
+      const barColor = oos ? '#ef4444' : '#f59e0b';
+      const hasSurplus = a.surplus_elsewhere && a.surplus_elsewhere.length;
+
+      let actionHtml = '';
+      if (hasSurplus) {
+        const best = a.surplus_elsewhere.reduce((b, s) => s.qty_available > b.qty_available ? s : b, a.surplus_elsewhere[0]);
+        actionHtml = `
+          <span class="action-tag action-transfer">Transfer ${Math.min(best.qty_available, rp)} from ${WN[best.warehouse] || best.warehouse}</span>
+          <a href="/transfers.html" class="action-btn">Create Transfer &rarr;</a>`;
+      } else {
+        actionHtml = `
+          <span class="action-tag action-reorder">Reorder from ${esc(a.supplier_name || '—')} (${a.lead_time_days || '?'}d)</span>
+          <a href="/purchase-orders.html" class="action-btn">Create PO &rarr;</a>`;
+      }
+
+      return `<div class="alert-card">
+        <div class="alert-icon ${iconClass}">${iconText}</div>
+        <div class="alert-info">
+          <div class="alert-name">${esc(a.name)}</div>
+          <div class="alert-meta">
+            <span>SKU: <strong>${esc(a.sku)}</strong></span>
+            <span>Brand: <strong>${esc(a.brand)}</strong></span>
+            <span>Supplier: <strong>${esc(a.supplier_name || '—')}</strong></span>
+            <span>Case pack: <strong>${a.case_pack || 1}</strong></span>
+          </div>
+          <div class="alert-stock">
+            <div class="alert-stock-bar"><div class="alert-stock-fill" style="width:${pct}%;background:${barColor}"></div></div>
+            <span class="alert-stock-text">${a.qty_on_hand} / ${a.reorder_point} (reorder point)</span>
+          </div>
+        </div>
+        <div class="alert-action">${actionHtml}</div>
+      </div>`;
+    }
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    load(); setInterval(load, 60000);
+  </script>
+</body>
+</html>

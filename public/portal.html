@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Portal — Fox & Fable Toy Sellers</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/base.css">
+  <style>
+    .portal-nav { background: #0f172a; color: #fff; padding: 0 2rem; }
+    .portal-nav-inner { max-width: 1440px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 56px; }
+    .portal-brand { font-weight: 700; font-size: .9375rem; letter-spacing: -.01em; }
+    .portal-brand span { color: #60a5fa; }
+    .portal-tag { font-size: .625rem; font-weight: 600; background: rgba(96,165,250,.15); color: #93c5fd; padding: .125rem .5rem; border-radius: 4px; margin-left: .5rem; letter-spacing: .04em; text-transform: uppercase; }
+    .portal-cust { display: flex; align-items: center; gap: .5rem; }
+    .portal-cust select { background: #1e293b; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px; padding: .375rem .75rem; font-size: .8125rem; font-family: inherit; }
+    .portal-cust select:focus { outline: none; border-color: #60a5fa; }
+    .portal-cust label { font-size: .75rem; color: #94a3b8; }
+
+    body { background: #f1f5f9; }
+    .page { max-width: 1440px; margin: 0 auto; padding: 1.5rem 2rem; }
+
+    .welcome { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: #fff; border-radius: 10px; padding: 2rem; margin-bottom: 1.5rem; }
+    .welcome h1 { font-size: 1.25rem; font-weight: 700; margin-bottom: .375rem; }
+    .welcome p { font-size: .8125rem; color: #94a3b8; }
+
+    .stock-controls { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+    .stock-controls input { padding: .4375rem .75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: .8125rem; font-family: inherit; width: 280px; background: #fff; }
+    .stock-controls input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
+    .stock-controls select { padding: .4375rem .75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: .8125rem; font-family: inherit; background: #fff; }
+    .stock-count { margin-left: auto; font-size: .75rem; color: #94a3b8; }
+
+    .stock-grid { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+    .stock-grid table { width: 100%; border-collapse: collapse; }
+    .stock-grid th { text-align: left; padding: .5rem .875rem; font-size: .6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; border-bottom: 1px solid #e2e8f0; background: #fafbfc; }
+    .stock-grid td { padding: .4375rem .875rem; font-size: .8125rem; border-bottom: 1px solid #f1f5f9; }
+    .stock-grid tr:hover td { background: #f8fafc; }
+    .stock-grid .r { text-align: right; font-variant-numeric: tabular-nums; }
+    .stock-grid .mono { font-family: ui-monospace, monospace; font-size: .6875rem; color: #94a3b8; }
+    .avail { display: inline-block; min-width: 36px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .avail.out { color: #dc2626; }
+    .avail.low { color: #d97706; }
+    .avail.ok { color: #16a34a; }
+
+    .qty-input { width: 56px; padding: .25rem .375rem; border: 1px solid #e2e8f0; border-radius: 4px; font-size: .8125rem; font-family: inherit; text-align: center; }
+    .qty-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.1); }
+    .add-btn { padding: .25rem .625rem; background: #0f172a; color: #fff; border: none; border-radius: 4px; font-size: .6875rem; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
+    .add-btn:hover { background: #1e293b; }
+    .add-btn:disabled { opacity: .4; cursor: default; }
+
+    .cart { position: sticky; bottom: 0; background: #fff; border-top: 2px solid #0f172a; padding: 1rem 2rem; margin: 1.5rem -2rem -1.5rem; box-shadow: 0 -4px 12px rgba(0,0,0,.06); }
+    .cart-inner { max-width: 1440px; margin: 0 auto; }
+    .cart-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .75rem; }
+    .cart-head h2 { font-size: .875rem; font-weight: 600; }
+    .cart-count { font-size: .75rem; color: #64748b; background: #f1f5f9; padding: .125rem .5rem; border-radius: 4px; margin-left: .5rem; }
+    .cart-items { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .75rem; max-height: 120px; overflow-y: auto; }
+    .cart-item { display: inline-flex; align-items: center; gap: .375rem; padding: .25rem .5rem .25rem .625rem; background: #f1f5f9; border-radius: 4px; font-size: .75rem; }
+    .cart-item-name { font-weight: 500; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cart-item-qty { color: #64748b; }
+    .cart-item-rm { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: .75rem; padding: 0 .125rem; }
+    .cart-item-rm:hover { color: #ef4444; }
+    .cart-actions { display: flex; align-items: center; gap: .75rem; }
+    .cart-total { font-size: .875rem; font-weight: 600; }
+    .cart-total span { color: #64748b; font-weight: 400; font-size: .75rem; }
+    .place-btn { padding: .5rem 1.25rem; background: #16a34a; color: #fff; border: none; border-radius: 6px; font-size: .8125rem; font-weight: 600; cursor: pointer; font-family: inherit; margin-left: auto; }
+    .place-btn:hover { background: #15803d; }
+    .place-btn:disabled { opacity: .5; cursor: default; }
+    .cart-empty { font-size: .8125rem; color: #94a3b8; padding: .5rem 0; }
+
+    .confirm-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.4); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    .confirm-box { background: #fff; border-radius: 10px; padding: 2rem; text-align: center; width: 400px; max-width: 95vw; box-shadow: 0 20px 40px rgba(0,0,0,.12); }
+    .confirm-icon { font-size: 2.5rem; margin-bottom: .75rem; }
+    .confirm-ref { font-size: 1.125rem; font-weight: 700; margin-bottom: .25rem; }
+    .confirm-msg { font-size: .8125rem; color: #64748b; margin-bottom: 1.25rem; }
+    .confirm-btn { padding: .5rem 1.5rem; background: #0f172a; color: #fff; border: none; border-radius: 6px; font-size: .8125rem; font-weight: 600; cursor: pointer; font-family: inherit; }
+
+    .no-cust { text-align: center; padding: 4rem 2rem; color: #94a3b8; font-size: .875rem; }
+    .no-cust strong { display: block; font-size: 1rem; color: #64748b; margin-bottom: .375rem; }
+
+    .acct-bar { display: flex; gap: .75rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .acct-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: .75rem 1rem; flex: 1; min-width: 140px; }
+    .acct-card-label { font-size: .5625rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: .25rem; }
+    .acct-card-val { font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .acct-card-sub { font-size: .6875rem; color: #94a3b8; margin-top: .125rem; }
+    .credit-bar { height: 4px; background: #f1f5f9; border-radius: 2px; margin-top: .375rem; }
+    .credit-fill { height: 100%; border-radius: 2px; transition: width 300ms; }
+
+    .moq-hint { font-size: .5625rem; color: #d97706; font-weight: 500; }
+    .tier-hint { font-size: .5625rem; color: #16a34a; font-weight: 500; }
+    .tier-info { font-size: .625rem; color: #64748b; cursor: pointer; text-decoration: underline dotted; }
+    .tier-tooltip { position: absolute; background: #0f172a; color: #fff; padding: .5rem .75rem; border-radius: 6px; font-size: .6875rem; z-index: 10; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+    .tier-tooltip::before { content: ''; position: absolute; top: -4px; left: 12px; width: 8px; height: 8px; background: #0f172a; transform: rotate(45deg); }
+    .discount-tag { display: inline-block; font-size: .5625rem; font-weight: 600; padding: .1rem .375rem; border-radius: 3px; background: #f0fdf4; color: #15803d; margin-left: .25rem; }
+
+    .cart-discount-row { font-size: .75rem; color: #16a34a; margin-bottom: .25rem; }
+    .cart-terms { font-size: .6875rem; color: #64748b; margin-top: .25rem; }
+    .moq-error { color: #dc2626; font-size: .6875rem; font-weight: 500; margin-top: .25rem; }
+    .credit-error { background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: .625rem .875rem; margin-bottom: .75rem; font-size: .75rem; color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <div class="portal-nav">
+    <div class="portal-nav-inner">
+      <div><span class="portal-brand">Fox & Fable <span>Wholesale</span></span><span class="portal-tag">Customer Portal</span></div>
+      <div class="portal-cust">
+        <label for="custSel">Ordering as:</label>
+        <select id="custSel" onchange="selectCustomer()">
+          <option value="">Select your company...</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div class="page">
+    <div id="welcome" style="display:none"></div>
+    <div id="noCust" class="no-cust">
+      <strong>Welcome to the Fox & Fable Wholesale Portal</strong>
+      Select your company from the dropdown above to browse stock and place orders.
+    </div>
+    <div id="stockSection" style="display:none">
+      <div class="stock-controls">
+        <input type="text" id="search" placeholder="Search products..." oninput="renderStock()" />
+        <select id="whSel" onchange="loadWarehouseStock()">
+          <option value="uk">London (UK)</option>
+          <option value="us">Charleston (US)</option>
+          <option value="eu">Hanover (DE)</option>
+        </select>
+        <span class="stock-count" id="stockCount"></span>
+      </div>
+      <div class="stock-grid">
+        <table>
+          <thead><tr><th>Brand</th><th>Product</th><th>SKU</th><th class="r">Price</th><th class="r">Available</th><th class="r" style="width:150px">Order</th></tr></thead>
+          <tbody id="stockBody"><tr><td colspan="6" class="empty">Loading stock...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div id="cartBar" class="cart" style="display:none">
+    <div class="cart-inner">
+      <div class="cart-head">
+        <div><h2>Your Order<span class="cart-count" id="cartCount">0</span></h2></div>
+      </div>
+      <div class="cart-items" id="cartItems"><div class="cart-empty">No items added yet</div></div>
+      <div class="cart-actions">
+        <div class="cart-total" id="cartTotal"><span>Total: </span>£0.00</div>
+        <button class="place-btn" id="placeBtn" onclick="placeOrder()" disabled>Place Order</button>
+      </div>
+    </div>
+  </div>
+  <div id="confirmModal"></div>
+  <script>
+    let customers = [], customer = null, stock = [], cart = [], allTiers = {}, productMoqs = {};
+
+    async function init() {
+      const [c, tierData] = await Promise.all([
+        fetch('/api/customers').then(r => r.json()),
+        fetch('/api/wholesale/pricing').then(r => r.json()),
+      ]);
+      customers = c;
+      // Build tier lookup: productId -> [{min_qty, discount_pct}]
+      for (const t of tierData) { allTiers[t.product_id] = t.tiers; productMoqs[t.product_id] = t.moq; }
+      const sel = document.getElementById('custSel');
+      customers.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        const tag = c.customer_type === 'distributor' ? ' [Distributor]' : c.customer_type === 'wholesale' ? ' [Wholesale]' : '';
+        opt.textContent = c.company_name + tag;
+        sel.appendChild(opt);
+      });
+    }
+
+    function selectCustomer() {
+      const id = document.getElementById('custSel').value;
+      customer = customers.find(c => c.id === id) || null;
+      cart = [];
+      if (customer) {
+        document.getElementById('noCust').style.display = 'none';
+        document.getElementById('welcome').style.display = '';
+        const isWholesale = customer.customer_type === 'wholesale' || customer.customer_type === 'distributor';
+        const terms = customer.payment_terms || 'prepaid';
+        const termsLabel = terms === 'prepaid' ? 'Prepaid' : terms.replace('net-', 'Net ') + ' days';
+
+        let welcomeHtml = `<div class="welcome"><h1>Welcome, ${esc(customer.company_name)}</h1><p>Browse our available stock below and add items to your order. Region: ${(customer.region || 'uk').toUpperCase()} · Currency: ${customer.currency_preference || 'GBP'}${isWholesale ? ' · ' + customer.customer_type.charAt(0).toUpperCase() + customer.customer_type.slice(1) + ' Account' : ''}</p></div>`;
+
+        if (isWholesale) {
+          const creditLimit = Number(customer.credit_limit_gbp) || 0;
+          const creditUsed = Number(customer.credit_used_gbp) || 0;
+          const creditAvail = creditLimit - creditUsed;
+          const creditPct = creditLimit > 0 ? Math.round((creditUsed / creditLimit) * 100) : 0;
+          const creditColor = creditPct > 80 ? '#ef4444' : creditPct > 60 ? '#f59e0b' : '#22c55e';
+          const discount = Number(customer.default_discount_pct) || 0;
+
+          welcomeHtml += `<div class="acct-bar">
+            <div class="acct-card"><div class="acct-card-label">Account Type</div><div class="acct-card-val">${customer.customer_type === 'distributor' ? 'Distributor' : 'Wholesale'}</div><div class="acct-card-sub">${termsLabel}</div></div>
+            ${creditLimit > 0 ? `<div class="acct-card"><div class="acct-card-label">Credit Available</div><div class="acct-card-val" style="color:${creditColor}">£${creditAvail.toLocaleString(undefined,{minimumFractionDigits:2})}</div><div class="acct-card-sub">of £${creditLimit.toLocaleString()} limit</div><div class="credit-bar"><div class="credit-fill" style="width:${creditPct}%;background:${creditColor}"></div></div></div>` : ''}
+            ${discount > 0 ? `<div class="acct-card"><div class="acct-card-label">Account Discount</div><div class="acct-card-val" style="color:#16a34a">${discount}%</div><div class="acct-card-sub">Applied to all orders</div></div>` : ''}
+            <div class="acct-card"><div class="acct-card-label">Payment Terms</div><div class="acct-card-val">${termsLabel}</div><div class="acct-card-sub">${terms === 'prepaid' ? 'Payment due on order' : 'Invoice on dispatch'}</div></div>
+          </div>`;
+        }
+
+        document.getElementById('welcome').innerHTML = welcomeHtml;
+        document.getElementById('stockSection').style.display = '';
+        document.getElementById('cartBar').style.display = '';
+        const wh = customer.region === 'us' ? 'us' : customer.region === 'eu' ? 'eu' : 'uk';
+        document.getElementById('whSel').value = wh;
+        loadWarehouseStock();
+      } else {
+        document.getElementById('noCust').style.display = '';
+        document.getElementById('welcome').style.display = 'none';
+        document.getElementById('stockSection').style.display = 'none';
+        document.getElementById('cartBar').style.display = 'none';
+      }
+      renderCart();
+    }
+
+    async function loadWarehouseStock() {
+      const wh = document.getElementById('whSel').value;
+      stock = await fetch('/api/warehouses/' + wh + '/stock').then(r => r.json());
+      renderStock();
+    }
+
+    function getEffectivePrice(productId, qty, basePrice) {
+      let discount = Number(customer?.default_discount_pct) || 0;
+      const tiers = allTiers[productId] || [];
+      for (const t of tiers) {
+        if (qty >= t.min_qty && Number(t.discount_pct) > discount) discount = Number(t.discount_pct);
+      }
+      return { price: Number((basePrice * (1 - discount / 100)).toFixed(2)), discount };
+    }
+
+    function renderStock() {
+      const q = document.getElementById('search').value.toLowerCase();
+      const filtered = stock.filter(s => s.qty_available > 0 && (!q || s.name.toLowerCase().includes(q) || s.sku.toLowerCase().includes(q) || s.brand.toLowerCase().includes(q)));
+      document.getElementById('stockCount').textContent = filtered.length + ' products available';
+      if (!filtered.length) {
+        document.getElementById('stockBody').innerHTML = '<tr><td colspan="6" class="empty">No available products found</td></tr>';
+        return;
+      }
+      document.getElementById('stockBody').innerHTML = filtered.map(s => {
+        const avClass = s.qty_available <= 5 ? 'low' : 'ok';
+        const inCart = cart.find(c => c.productId === s.product_id);
+        const moq = Number(s.moq) || productMoqs[s.product_id] || 1;
+        const basePrice = Number(s.sell_price_gbp);
+        const defaultQty = inCart ? inCart.qty : Math.max(moq, 1);
+        const tiers = allTiers[s.product_id] || [];
+        const { price: effPrice, discount } = getEffectivePrice(s.product_id, defaultQty, basePrice);
+
+        let priceHtml = `£${basePrice.toFixed(2)}`;
+        if (discount > 0) {
+          priceHtml = `<span style="text-decoration:line-through;color:#94a3b8;font-size:.6875rem">£${basePrice.toFixed(2)}</span> £${effPrice.toFixed(2)}<span class="discount-tag">-${discount}%</span>`;
+        }
+
+        let hintsHtml = '';
+        if (moq > 1) hintsHtml += `<div class="moq-hint">MOQ: ${moq} units</div>`;
+        if (tiers.length) hintsHtml += `<div class="tier-hint" style="position:relative"><span class="tier-info" onmouseenter="showTiers(event,'${s.product_id}')" onmouseleave="hideTiers()">${tiers.length} volume tier${tiers.length>1?'s':''}</span></div>`;
+
+        return `<tr>
+          <td style="font-weight:500;color:#475569;font-size:.75rem">${esc(s.brand)}</td>
+          <td style="font-weight:500">${esc(s.name)}${hintsHtml}</td>
+          <td class="mono">${esc(s.sku)}</td>
+          <td class="r">${priceHtml}</td>
+          <td class="r"><span class="avail ${avClass}">${s.qty_available}</span></td>
+          <td class="r" style="white-space:nowrap">
+            <input type="number" class="qty-input" id="q-${s.product_id}" min="${moq}" max="9999" value="${defaultQty}" onchange="updateQtyPrice('${s.product_id}',${basePrice})" />
+            <button class="add-btn" onclick="addToCart('${s.product_id}','${esc(s.name).replace(/'/g, "\\'")}','${esc(s.sku)}',${basePrice},${s.qty_available})">${inCart ? 'Update' : 'Add'}</button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    function updateQtyPrice(productId, basePrice) {
+      // Update just the price cell for this row without re-rendering the whole table
+      const input = document.getElementById('q-' + productId);
+      if (!input) return;
+      const qty = parseInt(input.value) || 1;
+      const { price: effPrice, discount } = getEffectivePrice(productId, qty, basePrice);
+      const row = input.closest('tr');
+      if (!row) return;
+      const priceCell = row.querySelectorAll('td')[3]; // 4th cell is price
+      if (!priceCell) return;
+      if (discount > 0) {
+        priceCell.innerHTML = `<span style="text-decoration:line-through;color:#94a3b8;font-size:.6875rem">£${basePrice.toFixed(2)}</span> £${effPrice.toFixed(2)}<span class="discount-tag">-${discount}%</span>`;
+      } else {
+        priceCell.innerHTML = `£${basePrice.toFixed(2)}`;
+      }
+    }
+
+    function showTiers(e, productId) {
+      hideTiers();
+      const tiers = allTiers[productId] || [];
+      if (!tiers.length) return;
+      const tip = document.createElement('div');
+      tip.className = 'tier-tooltip';
+      tip.id = 'tier-tip';
+      tip.innerHTML = '<strong>Volume Pricing:</strong><br>' + tiers.map(t => `Buy ${t.min_qty}+ → ${Number(t.discount_pct)}% off`).join('<br>');
+      e.target.parentElement.appendChild(tip);
+    }
+    function hideTiers() { const t = document.getElementById('tier-tip'); if (t) t.remove(); }
+
+    function addToCart(productId, name, sku, basePrice, maxQty) {
+      const input = document.getElementById('q-' + productId);
+      let qty = parseInt(input.value) || 1;
+      const moq = Number(productMoqs[productId]) || 1;
+      // Allow qty > available — excess will be backordered
+      qty = Math.max(qty, moq);
+      input.value = qty;
+      const { price, discount } = getEffectivePrice(productId, qty, basePrice);
+      const idx = cart.findIndex(c => c.productId === productId);
+      if (idx >= 0) {
+        cart[idx].qty = qty;
+        cart[idx].price = price;
+        cart[idx].basePrice = basePrice;
+        cart[idx].discount = discount;
+      } else {
+        cart.push({ productId, name, sku, price, basePrice, qty, discount });
+      }
+      renderCart();
+      renderStock();
+    }
+
+    function removeFromCart(productId) {
+      cart = cart.filter(c => c.productId !== productId);
+      renderCart();
+      renderStock();
+    }
+
+    function renderCart() {
+      document.getElementById('cartCount').textContent = cart.length;
+      if (!cart.length) {
+        document.getElementById('cartItems').innerHTML = '<div class="cart-empty">No items added yet</div>';
+        document.getElementById('cartTotal').innerHTML = '<span>Total: </span>£0.00';
+        document.getElementById('placeBtn').disabled = true;
+        return;
+      }
+      document.getElementById('cartItems').innerHTML = cart.map(c => {
+        const discountLabel = c.discount > 0 ? `<span class="discount-tag">-${c.discount}%</span>` : '';
+        return `<div class="cart-item">
+          <span class="cart-item-name">${esc(c.name)}</span>
+          <span class="cart-item-qty">&times;${c.qty}</span>
+          <span style="color:#64748b;font-variant-numeric:tabular-nums">£${(c.price * c.qty).toFixed(2)}</span>
+          ${discountLabel}
+          <button class="cart-item-rm" onclick="removeFromCart('${c.productId}')">&times;</button>
+        </div>`;
+      }).join('');
+
+      const total = cart.reduce((s, c) => s + c.price * c.qty, 0);
+      const baseTotal = cart.reduce((s, c) => s + (c.basePrice || c.price) * c.qty, 0);
+      const savings = baseTotal - total;
+
+      let totalHtml = '<span>Total: </span>£' + total.toFixed(2);
+      if (savings > 0.01) {
+        totalHtml += `<div class="cart-discount-row">You save £${savings.toFixed(2)} with volume/account discounts</div>`;
+      }
+
+      // Credit check warning
+      if (customer && customer.payment_terms !== 'prepaid' && Number(customer.credit_limit_gbp) > 0) {
+        const creditAvail = Number(customer.credit_limit_gbp) - Number(customer.credit_used_gbp);
+        if (total > creditAvail) {
+          totalHtml += `<div class="credit-error">Order exceeds available credit (£${creditAvail.toFixed(2)} remaining of £${Number(customer.credit_limit_gbp).toLocaleString()} limit)</div>`;
+        }
+        const terms = (customer.payment_terms || 'prepaid').replace('net-', 'Net ');
+        totalHtml += `<div class="cart-terms">Payment: ${terms} days · Credit remaining after order: £${Math.max(0, creditAvail - total).toFixed(2)}</div>`;
+      }
+
+      document.getElementById('cartTotal').innerHTML = totalHtml;
+      document.getElementById('placeBtn').disabled = false;
+    }
+
+    async function placeOrder() {
+      if (!customer || !cart.length) return;
+      document.getElementById('placeBtn').disabled = true;
+      document.getElementById('placeBtn').textContent = 'Placing...';
+      const wh = document.getElementById('whSel').value;
+      const body = {
+        customerId: customer.id,
+        customerName: customer.company_name,
+        warehouseCode: wh,
+        currency: customer.currency_preference || 'GBP',
+        lines: cart.map(c => ({
+          productId: c.productId,
+          productName: c.name,
+          sku: c.sku,
+          qtyOrdered: c.qty,
+          unitPriceGbp: c.price
+        }))
+      };
+      try {
+        const r = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const order = await r.json();
+        if (r.ok) {
+          cart = [];
+          // Refresh customer data to update credit used
+          customers = await fetch('/api/customers').then(r => r.json());
+          customer = customers.find(c => c.id === customer.id) || customer;
+          renderCart();
+          const terms = (customer.payment_terms || 'prepaid').replace('net-', 'Net ');
+          const termsMsg = customer.payment_terms !== 'prepaid' ? `<br><span style="color:#64748b;font-size:.75rem">Payment terms: ${terms} days</span>` : '';
+          document.getElementById('confirmModal').innerHTML = `
+            <div class="confirm-overlay">
+              <div class="confirm-box">
+                <div class="confirm-icon">&#10003;</div>
+                <div class="confirm-ref">${esc(order.order_ref)}</div>
+                <div class="confirm-msg">Your order has been placed successfully and is being processed.<br>You'll receive a confirmation at ${esc(customer.email || 'your email on file')}.${termsMsg}</div>
+                <button class="confirm-btn" onclick="closeConfirm()">Continue Shopping</button>
+              </div>
+            </div>`;
+        } else if (order.error === 'moq_not_met') {
+          const items = order.details.map(d => `${d.productName}: minimum ${d.moq}, you ordered ${d.ordered}`).join('\n');
+          alert('Minimum order quantity not met:\n\n' + items);
+        } else if (order.error === 'credit_limit_exceeded') {
+          alert(`Credit limit exceeded.\n\nOrder total: £${order.orderTotal.toFixed(2)}\nCredit available: £${order.creditAvailable.toFixed(2)}\nCredit limit: £${order.creditLimit.toFixed(2)}`);
+        } else {
+          alert('Error: ' + (order.error || 'Could not place order'));
+        }
+      } catch (e) {
+        alert('Error placing order: ' + e.message);
+      }
+      document.getElementById('placeBtn').disabled = false;
+      document.getElementById('placeBtn').textContent = 'Place Order';
+    }
+
+    function closeConfirm() {
+      document.getElementById('confirmModal').innerHTML = '';
+      loadWarehouseStock();
+    }
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    init();
+  </script>
+</body>
+</html>

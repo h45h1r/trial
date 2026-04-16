@@ -1,0 +1,26 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Returns — Fox & Fable WMS</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/base.css"></head>
+<body><script src="/nav.js"></script><script>renderNav('returns')</script>
+  <div class="page"><div class="hdr"><h1>Returns / RMA</h1><button class="btn btn-dark" onclick="openCreate()">+ New Return</button></div>
+    <div class="tw"><table><thead><tr><th>RMA Ref</th><th>Product</th><th>SKU</th><th>Warehouse</th><th class="r">Qty</th><th>Reason</th><th>Action</th><th>Status</th><th>Date</th><th></th></tr></thead>
+    <tbody id="tb"><tr><td colspan="10" class="empty">Loading...</td></tr></tbody></table></div></div>
+  <div id="mr"></div>
+  <script>
+    const WN={uk:'London · UK',us:'Charleston · US',eu:'Hanover · DE'};let products=[];
+    async function init(){products=await fetch('/api/products').then(r=>r.json());load()}
+    async function load(){const d=await fetch('/api/returns').then(r=>r.json());
+      if(!d.length){document.getElementById('tb').innerHTML='<tr><td colspan="10" class="empty">No returns yet</td></tr>';return}
+      document.getElementById('tb').innerHTML=d.map(r=>{const dt=new Date(r.created_at);
+        return `<tr><td class="mono" style="font-weight:600;color:#334155">${r.rma_ref}</td><td>${esc(r.product_name||'')}</td><td class="mono">${esc(r.sku||'')}</td><td>${WN[r.warehouse_code]||r.warehouse_code}</td><td class="r">${r.qty}</td><td>${esc(r.reason||'—')}</td><td><span class="badge b-${r.action}">${r.action.replace('_',' ')}</span></td><td><span class="badge b-${r.status}">${r.status}</span></td><td class="mono">${dt.toLocaleDateString('en-GB')}</td><td>${r.status==='pending'?`<button class="btn btn-sm btn-green" onclick="process('${r.id}')">Process</button>`:''}</td></tr>`}).join('')}
+    function openCreate(){document.getElementById('mr').innerHTML=`<div class="overlay" onclick="closeM(event)"><div class="modal" onclick="event.stopPropagation()"><h3>New Return</h3>
+      <div class="field"><label>Product</label><select id="rp">${products.map(p=>`<option value="${p.id}">${p.brand} — ${p.name} (${p.sku})</option>`).join('')}</select></div>
+      <div class="field"><label>Return to Warehouse</label><select id="rw"><option value="uk">London · UK</option><option value="us">Charleston · US</option><option value="eu">Hanover · DE</option></select></div>
+      <div class="field"><label>Quantity</label><input id="rq" type="number" min="1" value="1"/></div>
+      <div class="field"><label>Reason</label><input id="rr" placeholder="e.g. Damaged in transit"/></div>
+      <div class="field"><label>Action</label><select id="ra"><option value="restock">Restock</option><option value="write_off">Write Off</option><option value="replace">Replace</option></select></div>
+      <div class="actions"><button class="btn btn-ghost" onclick="closeM()">Cancel</button><button class="btn btn-dark" onclick="create()">Create Return</button></div></div></div>`}
+    async function create(){await fetch('/api/returns',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productId:document.getElementById('rp').value,warehouseCode:document.getElementById('rw').value,qty:parseInt(document.getElementById('rq').value),reason:document.getElementById('rr').value,action:document.getElementById('ra').value})});closeM();load()}
+    async function process(id){await fetch(`/api/returns/${id}/process`,{method:'PATCH'});load()}
+    function closeM(e){if(e&&e.target!==e.currentTarget)return;document.getElementById('mr').innerHTML=''}
+    function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+    init();
+  </script></body></html>

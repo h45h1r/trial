@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Purchase Orders — Fox & Fable WMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a;-webkit-font-smoothing:antialiased}
+    .page{max-width:1440px;margin:0 auto;padding:1.5rem 2rem}
+    .hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem}
+    h1{font-size:1.5rem;font-weight:700;letter-spacing:-.02em}
+    .btn{padding:.4375rem .875rem;border-radius:6px;font-size:.8125rem;font-weight:500;cursor:pointer;border:none;font-family:inherit}
+    .btn-dark{background:#0f172a;color:#fff}.btn-dark:hover{background:#1e293b}
+    .btn-ghost{background:#fff;color:#64748b;border:1px solid #e2e8f0}
+    .btn-sm{padding:.25rem .625rem;font-size:.75rem}
+    .btn-blue{background:#2563eb;color:#fff}.btn-green{background:#16a34a;color:#fff}
+    .tw{background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden}
+    table{width:100%;border-collapse:collapse}
+    th{text-align:left;padding:.5rem .875rem;font-size:.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;border-bottom:1px solid #e2e8f0;background:#fafbfc}
+    td{padding:.4375rem .875rem;font-size:.8125rem;border-bottom:1px solid #f1f5f9}
+    tr:hover td{background:#f8fafc}
+    .r{text-align:right;font-variant-numeric:tabular-nums}
+    .mono{font-family:ui-monospace,monospace;font-size:.75rem;color:#94a3b8}
+    .badge{display:inline-block;padding:.125rem .5rem;border-radius:4px;font-size:.6875rem;font-weight:600}
+    .b-draft{background:#f1f5f9;color:#64748b}.b-submitted{background:#dbeafe;color:#1d4ed8}.b-partial{background:#fffbeb;color:#a16207}.b-received{background:#f0fdf4;color:#15803d}.b-cancelled{background:#fef2f2;color:#b91c1c}
+    .empty{text-align:center;padding:2.5rem;color:#94a3b8;font-size:.8125rem}
+    .overlay{position:fixed;inset:0;background:rgba(15,23,42,.4);display:flex;align-items:center;justify-content:center;z-index:100}
+    .modal{background:#fff;border-radius:8px;padding:1.5rem;width:900px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 40px rgba(0,0,0,.12)}
+    .modal h3{font-size:1rem;font-weight:600;margin-bottom:1rem}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem}
+    .field{margin-bottom:.75rem}.field label{display:block;font-size:.8125rem;font-weight:500;color:#475569;margin-bottom:.25rem}
+    .field select,.field input{width:100%;padding:.4375rem .75rem;border:1px solid #e2e8f0;border-radius:6px;font-size:.8125rem;font-family:inherit;background:#fff}
+    .field select:focus,.field input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+    .lines{border:1px solid #e2e8f0;border-radius:6px;padding:.75rem;margin-bottom:.5rem}
+    .line{display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;font-size:.8125rem}.line:last-child{margin-bottom:0}
+    .line select{flex:2;padding:.375rem;border:1px solid #e2e8f0;border-radius:4px;font-size:.8125rem;font-family:inherit}
+    .line input{width:80px;padding:.375rem;border:1px solid #e2e8f0;border-radius:4px;font-size:.8125rem;text-align:right;font-family:inherit}
+    .line .rm{color:#ef4444;cursor:pointer;font-size:1rem;background:none;border:none}
+    .add-line{font-size:.8125rem;color:#3b82f6;cursor:pointer;background:none;border:none;font-weight:500;font-family:inherit;margin-bottom:.75rem}
+    .actions{display:flex;gap:.5rem;justify-content:flex-end}
+    .rcv-input{width:60px;padding:.25rem;border:1px solid #e2e8f0;border-radius:4px;text-align:right;font-size:.8125rem;font-family:inherit}
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script><script>renderNav('purchase-orders')</script>
+  <div class="page">
+    <div class="hdr"><h1>Purchase Orders</h1><button class="btn btn-dark" onclick="openCreate()">+ New PO</button></div>
+    <div class="tw"><table><thead><tr><th>PO Ref</th><th>Supplier</th><th>Warehouse</th><th>Status</th><th class="r">Lines</th><th class="r">Ordered</th><th class="r">Received</th><th class="r">Cost</th><th>Created</th><th></th></tr></thead>
+    <tbody id="tb"><tr><td colspan="10" class="empty">Loading...</td></tr></tbody></table></div>
+  </div>
+  <div id="mr"></div>
+  <script>
+    const WN={uk:'London · UK',us:'Charleston · US',eu:'Hanover · DE'};
+    let suppliers=[],products=[];
+    async function init(){[suppliers,products]=await Promise.all([fetch('/api/suppliers').then(r=>r.json()),fetch('/api/products').then(r=>r.json())]);loadPOs()}
+
+    async function loadPOs(){
+      const pos=await fetch('/api/purchase-orders').then(r=>r.json());
+      if(!pos.length){document.getElementById('tb').innerHTML='<tr><td colspan="10" class="empty">No purchase orders yet</td></tr>';return}
+      document.getElementById('tb').innerHTML=pos.map(po=>{
+        const d=new Date(po.created_at),acts=[];
+        if(po.status==='draft'){acts.push(`<button class="btn btn-sm btn-blue" onclick="submitPO('${po.id}')">Submit</button>`);acts.push(`<button class="btn btn-sm" style="background:#fef2f2;color:#b91c1c" onclick="deletePO('${po.id}','${po.po_ref}')">Delete</button>`);}
+        if(po.status==='submitted'||po.status==='partial')acts.push(`<button class="btn btn-sm btn-green" onclick="openRcv('${po.id}')">Receive</button>`);
+        return `<tr><td class="mono" style="font-weight:600;color:#334155">${po.po_ref}</td><td>${esc(po.supplier_name||'')}</td><td>${WN[po.warehouse_code]||po.warehouse_code}</td>
+          <td><span class="badge b-${po.status}">${po.status}</span></td><td class="r">${po.line_count}</td><td class="r">${po.total_ordered}</td><td class="r">${po.total_received}</td>
+          <td class="r">£${Number(po.total_cost_gbp).toFixed(2)}</td><td class="mono">${d.toLocaleDateString('en-GB')}</td><td>${acts.join(' ')}</td></tr>`;
+      }).join('');
+    }
+
+    let gli=0;
+    function getSupplierProducts(){
+      const sid=document.getElementById('po-s')?.value;
+      return products.filter(p=>p.supplier_id===sid);
+    }
+    function openCreate(){
+      gli=0;
+      document.getElementById('mr').innerHTML=`<div class="overlay" onclick="closeM(event)"><div class="modal" onclick="event.stopPropagation()">
+        <h3>New Purchase Order</h3>
+        <div class="form-row"><div class="field"><label>Supplier</label><select id="po-s" onchange="refreshLines()">${suppliers.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select></div>
+        <div class="field"><label>Deliver to</label><select id="po-w"><option value="uk">London · UK</option><option value="us">Charleston · US</option><option value="eu">Hanover · DE</option></select></div></div>
+        <div class="field"><label>Notes</label><input type="text" id="po-n" placeholder="Optional"/></div>
+        <div class="field"><label>Line items</label></div>
+        <div class="lines" id="lns">${mkLn()}</div><button class="add-line" onclick="addLn()">+ Add line</button>
+        <div class="actions"><button class="btn btn-ghost" onclick="closeM()">Cancel</button><button class="btn btn-dark" id="create-btn" onclick="createPO()">Create PO</button></div>
+      </div></div>`;
+      document.getElementById('mr').addEventListener('change',e=>{if(e.target.id?.startsWith('lp-')){const i=e.target.id.split('-')[1],o=e.target.selectedOptions[0];if(o?.dataset.cost)document.getElementById(`lc-${i}`).value=o.dataset.cost}});
+    }
+    function refreshLines(){document.getElementById('lns').innerHTML=mkLn()}
+    function mkLn(){const i=gli++;const sp=getSupplierProducts();return `<div class="line"><select id="lp-${i}"><option value="">Select product...</option>${sp.map(p=>`<option value="${p.id}" data-cost="${p.cost_price_gbp}">${p.name} (${p.sku})</option>`).join('')}</select><input type="number" id="lq-${i}" placeholder="Qty" min="1"/><input type="number" id="lc-${i}" placeholder="Cost" step="0.01"/><button class="rm" onclick="this.parentElement.remove()">×</button></div>`}
+    function addLn(){document.getElementById('lns').insertAdjacentHTML('beforeend',mkLn())}
+
+    let creating=false;
+    async function createPO(){
+      if(creating)return;
+      const lines=[];document.querySelectorAll('#lns>.line').forEach(el=>{const s=el.querySelector('select'),q=el.querySelectorAll('input')[0],c=el.querySelectorAll('input')[1];
+        if(s.value&&q.value)lines.push({productId:s.value,qtyOrdered:parseInt(q.value),unitCost:parseFloat(c.value)||0})});
+      if(!lines.length)return alert('Add line items');
+      creating=true;const btn=document.getElementById('create-btn');btn.textContent='Creating...';btn.style.opacity='0.5';
+      await fetch('/api/purchase-orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({supplierId:document.getElementById('po-s').value,warehouseCode:document.getElementById('po-w').value,lines,notes:document.getElementById('po-n').value})});
+      creating=false;closeM();loadPOs();
+    }
+    async function submitPO(id){await fetch(`/api/purchase-orders/${id}/submit`,{method:'PATCH'});loadPOs()}
+    async function deletePO(id,ref){if(!confirm(`Delete ${ref}?`))return;await fetch(`/api/purchase-orders/${id}`,{method:'DELETE'});loadPOs()}
+
+    async function openRcv(id){
+      const po=await fetch(`/api/purchase-orders/${id}`).then(r=>r.json());
+      document.getElementById('mr').innerHTML=`<div class="overlay" onclick="closeM(event)"><div class="modal" onclick="event.stopPropagation()">
+        <h3>Receive Goods — ${po.po_ref}</h3><p style="font-size:.8125rem;color:#64748b;margin-bottom:1rem">${po.supplier_name} → ${WN[po.warehouse_code]}</p>
+        <div class="tw"><table><thead><tr><th>Product</th><th>SKU</th><th class="r">Ordered</th><th class="r">Received</th><th class="r">Receiving</th></tr></thead><tbody>
+        ${po.lines.map(l=>`<tr><td>${esc(l.product_name)}</td><td class="mono">${l.sku}</td><td class="r">${l.qty_ordered}</td><td class="r">${l.qty_received}</td><td class="r"><input class="rcv-input" id="rv-${l.id}" type="number" min="0" max="${l.qty_ordered-l.qty_received}" value="${l.qty_ordered-l.qty_received}"/></td></tr>`).join('')}
+        </tbody></table></div>
+        <div class="actions" style="margin-top:1rem"><button class="btn btn-ghost" onclick="closeM()">Cancel</button><button class="btn btn-green" onclick="doRcv('${id}',[${po.lines.map(l=>`'${l.id}'`).join(',')}])">Confirm Receipt</button></div>
+      </div></div>`;
+    }
+    async function doRcv(poId,lineIds){
+      const lines=lineIds.map(lid=>({lineId:lid,qtyReceived:parseInt(document.getElementById(`rv-${lid}`)?.value)||0})).filter(l=>l.qtyReceived>0);
+      await fetch(`/api/purchase-orders/${poId}/receive`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lines})});
+      closeM();loadPOs();
+    }
+    function closeM(e){if(e&&e.target!==e.currentTarget)return;document.getElementById('mr').innerHTML=''}
+    function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+    init();
+  </script>
+</body>
+</html>

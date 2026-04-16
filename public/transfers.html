@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transfers — Fox & Fable WMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a;-webkit-font-smoothing:antialiased}.page{max-width:1440px;margin:0 auto;padding:1.5rem 2rem}.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem}h1{font-size:1.5rem;font-weight:700;letter-spacing:-.02em}.btn{padding:.4375rem .875rem;border-radius:6px;font-size:.8125rem;font-weight:500;cursor:pointer;border:none;font-family:inherit}.btn-dark{background:#0f172a;color:#fff}.btn-dark:hover{background:#1e293b}.btn-ghost{background:#fff;color:#64748b;border:1px solid #e2e8f0}.btn-sm{padding:.25rem .625rem;font-size:.75rem}.btn-blue{background:#2563eb;color:#fff}.btn-green{background:#16a34a;color:#fff}.tw{background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden}table{width:100%;border-collapse:collapse}th{text-align:left;padding:.5rem .875rem;font-size:.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;border-bottom:1px solid #e2e8f0;background:#fafbfc}td{padding:.4375rem .875rem;font-size:.8125rem;border-bottom:1px solid #f1f5f9}tr:hover td{background:#f8fafc}.r{text-align:right;font-variant-numeric:tabular-nums}.mono{font-family:ui-monospace,monospace;font-size:.75rem;color:#94a3b8}.badge{display:inline-block;padding:.125rem .5rem;border-radius:4px;font-size:.6875rem;font-weight:600}.b-requested{background:#fffbeb;color:#a16207}.b-in_transit{background:#dbeafe;color:#1d4ed8}.b-received{background:#f0fdf4;color:#15803d}.b-cancelled{background:#fef2f2;color:#b91c1c}.arrow{color:#94a3b8;font-weight:700}.empty{text-align:center;padding:2.5rem;color:#94a3b8;font-size:.8125rem}.overlay{position:fixed;inset:0;background:rgba(15,23,42,.4);display:flex;align-items:center;justify-content:center;z-index:100}.modal{background:#fff;border-radius:8px;padding:1.5rem;width:560px;max-width:92vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 40px rgba(0,0,0,.12)}.modal h3{font-size:1rem;font-weight:600;margin-bottom:1rem}.form-row{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem}.field{margin-bottom:.75rem}.field label{display:block;font-size:.8125rem;font-weight:500;color:#475569;margin-bottom:.25rem}.field select,.field input{width:100%;padding:.4375rem .75rem;border:1px solid #e2e8f0;border-radius:6px;font-size:.8125rem;font-family:inherit;background:#fff}.field select:focus,.field input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}.lines{border:1px solid #e2e8f0;border-radius:6px;padding:.75rem;margin-bottom:.5rem;overflow:hidden}.line{display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;font-size:.8125rem}.line:last-child{margin-bottom:0}.line select{flex:1;min-width:0;padding:.375rem;border:1px solid #e2e8f0;border-radius:4px;font-size:.8125rem;font-family:inherit;overflow:hidden;text-overflow:ellipsis}.line input{width:72px;flex-shrink:0;padding:.375rem;border:1px solid #e2e8f0;border-radius:4px;font-size:.8125rem;text-align:right;font-family:inherit}.line .rm{color:#ef4444;cursor:pointer;font-size:1rem;background:none;border:none;flex-shrink:0}.add-line{font-size:.8125rem;color:#3b82f6;cursor:pointer;background:none;border:none;font-weight:500;font-family:inherit;margin-bottom:.75rem}.actions{display:flex;gap:.5rem;justify-content:flex-end}
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script><script>renderNav('transfers')</script>
+  <div class="page">
+    <div class="hdr"><h1>Stock Transfers</h1><button class="btn btn-dark" onclick="openCreate()">+ New Transfer</button></div>
+    <div class="tw"><table><thead><tr><th>Ref</th><th>From</th><th></th><th>To</th><th>Status</th><th class="r">Items</th><th class="r">Units</th><th>Created</th><th></th></tr></thead>
+    <tbody id="tb"><tr><td colspan="9" class="empty">Loading...</td></tr></tbody></table></div>
+  </div>
+  <div id="mr"></div>
+  <script>
+    const WN={uk:'London · UK',us:'Charleston · US',eu:'Hanover · DE'};
+    let products=[];
+    async function init(){products=await fetch('/api/products').then(r=>r.json());load()}
+    async function load(){
+      const d=await fetch('/api/transfers').then(r=>r.json());
+      if(!d.length){document.getElementById('tb').innerHTML='<tr><td colspan="9" class="empty">No transfers yet</td></tr>';return}
+      document.getElementById('tb').innerHTML=d.map(t=>{
+        const dt=new Date(t.created_at),acts=[];
+        if(t.status==='requested')acts.push(`<button class="btn btn-sm btn-blue" onclick="dispatch('${t.id}')">Dispatch</button>`);
+        if(t.status==='in_transit')acts.push(`<button class="btn btn-sm btn-green" onclick="receive('${t.id}')">Receive</button>`);
+        return `<tr><td class="mono" style="font-weight:600;color:#334155">${t.transfer_ref}</td><td>${WN[t.from_warehouse]||t.from_warehouse}</td><td class="arrow">→</td><td>${WN[t.to_warehouse]||t.to_warehouse}</td>
+          <td><span class="badge b-${t.status}">${t.status.replace('_',' ')}</span></td><td class="r">${t.line_count}</td><td class="r">${t.total_units}</td><td class="mono">${dt.toLocaleDateString('en-GB')}</td><td>${acts.join(' ')}</td></tr>`;
+      }).join('');
+    }
+    async function dispatch(id){const r=await fetch(`/api/transfers/${id}/dispatch`,{method:'PATCH'});const d=await r.json();if(d.error)alert(d.error);load()}
+    async function receive(id){await fetch(`/api/transfers/${id}/receive`,{method:'PATCH'});load()}
+
+    let li=0;
+    function openCreate(){
+      li=0;document.getElementById('mr').innerHTML=`<div class="overlay" onclick="closeM(event)"><div class="modal" onclick="event.stopPropagation()">
+        <h3>New Stock Transfer</h3>
+        <div class="form-row"><div class="field"><label>From</label><select id="xf"><option value="uk">London · UK</option><option value="us">Charleston · US</option><option value="eu">Hanover · DE</option></select></div>
+        <div class="field"><label>To</label><select id="xt"><option value="us">Charleston · US</option><option value="uk">London · UK</option><option value="eu">Hanover · DE</option></select></div></div>
+        <div class="field"><label>Notes</label><input type="text" id="xn" placeholder="Optional"/></div>
+        <div class="field"><label>Items</label></div><div class="lines" id="lns">${mkLn()}</div><button class="add-line" onclick="addLn()">+ Add item</button>
+        <div class="actions"><button class="btn btn-ghost" onclick="closeM()">Cancel</button><button class="btn btn-dark" onclick="create()">Create Transfer</button></div>
+      </div></div>`;
+    }
+    function mkLn(){const i=li++;return `<div class="line"><select id="tp-${i}"><option value="">Select product...</option>${products.map(p=>{const nm=p.name.length>32?p.name.slice(0,30)+'…':p.name;return`<option value="${p.id}">${p.sku} · ${nm}</option>`}).join('')}</select><input type="number" id="tq-${i}" placeholder="Qty" min="1"/><button class="rm" onclick="this.parentElement.remove()">×</button></div>`}
+    function addLn(){document.getElementById('lns').insertAdjacentHTML('beforeend',mkLn())}
+
+    async function create(){
+      const f=document.getElementById('xf').value,t=document.getElementById('xt').value;if(f===t)return alert('Same warehouse');
+      const lines=[];document.querySelectorAll('#lns>.line').forEach(el=>{const s=el.querySelector('select'),q=el.querySelector('input[type=number]');if(s.value&&q.value)lines.push({productId:s.value,qty:parseInt(q.value)})});
+      if(!lines.length)return alert('Add items');
+      await fetch('/api/transfers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fromWarehouse:f,toWarehouse:t,lines,notes:document.getElementById('xn').value})});
+      closeM();load();
+    }
+    function closeM(e){if(e&&e.target!==e.currentTarget)return;document.getElementById('mr').innerHTML=''}
+    function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+    init();
+  </script>
+</body>
+</html>

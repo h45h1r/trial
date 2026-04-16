@@ -1,0 +1,31 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Audit Log — Fox & Fable WMS</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/base.css">
+  <style>.tag{font-size:.625rem;font-weight:600;padding:.1rem .375rem;border-radius:3px;white-space:nowrap;letter-spacing:.02em;text-transform:uppercase}.q-pos{color:#16a34a;font-weight:600}.q-neg{color:#dc2626;font-weight:600}</style></head>
+<body><script src="/nav.js"></script><script>renderNav('audit')</script>
+  <div class="page"><h1 style="margin-bottom:1rem">Audit Log</h1>
+    <div class="controls">
+      <select id="wf"><option value="">All Warehouses</option><option value="uk">London · UK</option><option value="us">Charleston · US</option><option value="eu">Hanover · DE</option></select>
+      <select id="af"><option value="">All Actions</option><option value="stock_received">Stock Received</option><option value="stock_shipped">Stock Shipped</option><option value="stock_transferred_out">Transferred Out</option><option value="stock_transferred_in">Transferred In</option><option value="stock_adjusted">Stock Adjusted</option><option value="stock_returned">Stock Returned</option><option value="order_created">Order Created</option><option value="order_pick">Order Picked</option><option value="order_pack">Order Packed</option><option value="order_ship">Order Shipped</option><option value="po_created">PO Created</option><option value="po_submitted">PO Submitted</option><option value="transfer_created">Transfer Created</option><option value="return_created">Return Created</option></select>
+    </div>
+    <div class="tw"><table><thead><tr><th>Time</th><th>Action</th><th>Warehouse</th><th>Product</th><th class="r">Change</th><th class="r">Balance</th><th>Notes</th></tr></thead>
+    <tbody id="tb"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody></table></div></div>
+  <script>
+    const colors={stock_received:'#dcfce7;#15803d',stock_shipped:'#fee2e2;#b91c1c',stock_transferred_out:'#fef3c7;#a16207',stock_transferred_in:'#dbeafe;#1d4ed8',stock_adjusted:'#f3e8ff;#7c3aed',stock_returned:'#dcfce7;#15803d',stock_written_off:'#fef2f2;#991b1b',order_created:'#dbeafe;#1d4ed8',order_pick:'#fef3c7;#a16207',order_pack:'#dbeafe;#1d4ed8',order_ship:'#dcfce7;#15803d',po_created:'#dbeafe;#1d4ed8',po_submitted:'#dbeafe;#1d4ed8',po_auto_created:'#f3e8ff;#7c3aed',return_created:'#fef3c7;#a16207',transfer_created:'#dbeafe;#1d4ed8'};
+    const WL={uk:'UK',us:'US',eu:'DE'};
+    async function load(){
+      const w=document.getElementById('wf').value,a=document.getElementById('af').value;
+      const p=new URLSearchParams({limit:'200'});if(w)p.set('warehouse',w);if(a)p.set('action',a);
+      const d=await fetch(`/api/audit-log?${p}`).then(r=>r.json());
+      if(!d.length){document.getElementById('tb').innerHTML='<tr><td colspan="7" class="empty">No audit entries</td></tr>';return}
+      document.getElementById('tb').innerHTML=d.map(r=>{
+        const t=new Date(r.created_at),c=(colors[r.action]||'#f1f5f9;#64748b').split(';');
+        const qc=r.qty_change>0?'q-pos':r.qty_change<0?'q-neg':'';
+        const qt=r.qty_change!=null?(r.qty_change>0?'+':'')+r.qty_change:'—';
+        return `<tr><td class="mono">${t.toLocaleDateString('en-GB',{day:'numeric',month:'short'})} ${t.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</td>
+          <td><span class="tag" style="background:${c[0]};color:${c[1]}">${r.action.replace(/_/g,' ')}</span></td>
+          <td>${r.warehouse_code?`<span class="badge" style="background:#f1f5f9;color:#64748b">${WL[r.warehouse_code]||r.warehouse_code}</span>`:'—'}</td>
+          <td>${r.product_name?esc(r.product_name)+` <span class="mono">${r.product_sku||''}</span>`:'—'}</td>
+          <td class="r ${qc}">${qt}</td><td class="r">${r.balance_after!=null?r.balance_after:'—'}</td>
+          <td style="max-width:280px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.notes||'')}</td></tr>`}).join('')}
+    function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+    document.getElementById('wf').addEventListener('change',load);document.getElementById('af').addEventListener('change',load);load();
+  </script></body></html>

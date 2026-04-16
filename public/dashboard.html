@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Fox & Fable WMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #f8fafc; color: #0f172a; -webkit-font-smoothing: antialiased; }
+    .page { max-width: 1440px; margin: 0 auto; padding: 1.5rem 2rem; }
+    .page-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 1.5rem; }
+    .page-header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -.02em; }
+    .meta { font-size: .75rem; color: #94a3b8; }
+
+    .kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px; margin-bottom: 1.5rem; background: #e2e8f0; border-radius: 8px; overflow: hidden; }
+    .kpi { padding: 1.125rem 1.25rem; background: #fff; }
+    .kpi.primary { background: #0f172a; color: #fff; }
+    .kpi-label { font-size: .6875rem; font-weight: 500; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; margin-bottom: .25rem; }
+    .kpi.primary .kpi-label { color: #64748b; }
+    .kpi-val { font-size: 1.625rem; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1.1; }
+    .kpi-sub { font-size: .6875rem; color: #94a3b8; margin-top: .25rem; }
+    .kpi.primary .kpi-sub { color: #475569; }
+
+    .section-title { font-size: .6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: .75rem; }
+    .wh-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; margin-bottom: 1.5rem; }
+    .wh { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.25rem; }
+    .wh-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+    .wh-name { font-size: .9375rem; font-weight: 600; }
+    .wh-region { font-size: .6875rem; color: #94a3b8; margin-left: .375rem; }
+    .wh-tag { font-size: .6875rem; font-weight: 600; padding: .125rem .5rem; border-radius: 4px; }
+    .tag-ok { background: #f0fdf4; color: #15803d; }
+    .tag-warn { background: #fffbeb; color: #a16207; }
+    .tag-crit { background: #fef2f2; color: #b91c1c; }
+    .wh-bar { height: 4px; background: #f1f5f9; border-radius: 2px; margin-bottom: 1rem; }
+    .wh-bar-fill { height: 100%; border-radius: 2px; }
+    .wh-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+    .wh-stat-l { font-size: .625rem; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; font-weight: 500; }
+    .wh-stat-v { font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: .125rem; }
+
+    .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-bottom: 1.5rem; }
+    .chart-panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.25rem; }
+    .chart-panel h2 { font-size: .8125rem; font-weight: 600; margin-bottom: 1rem; }
+    .chart-wrap { position: relative; height: 260px; }
+
+    .cols { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+    .panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; padding: .875rem 1.25rem; border-bottom: 1px solid #f1f5f9; }
+    .panel-head h2 { font-size: .8125rem; font-weight: 600; }
+    .panel-head a { font-size: .75rem; color: #3b82f6; text-decoration: none; font-weight: 500; }
+    .panel-head a:hover { text-decoration: underline; }
+
+    .a-row { display: flex; align-items: center; gap: .625rem; padding: .5rem 1.25rem; border-bottom: 1px solid #f8fafc; font-size: .8125rem; }
+    .a-row:last-child { border-bottom: none; }
+    .a-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+    .a-wh { font-size: .625rem; font-weight: 600; padding: .1rem .375rem; border-radius: 3px; background: #f1f5f9; color: #64748b; text-transform: uppercase; letter-spacing: .03em; }
+    .a-name { font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .a-qty { font-variant-numeric: tabular-nums; color: #94a3b8; font-size: .75rem; min-width: 36px; text-align: right; }
+    .a-hint { font-size: .6875rem; min-width: 48px; text-align: right; }
+
+    .l-row { display: flex; align-items: center; gap: .625rem; padding: .5rem 1.25rem; border-bottom: 1px solid #f8fafc; font-size: .8125rem; }
+    .l-row:last-child { border-bottom: none; }
+    .l-time { font-size: .6875rem; color: #94a3b8; font-variant-numeric: tabular-nums; min-width: 96px; }
+    .l-tag { font-size: .625rem; font-weight: 600; padding: .1rem .375rem; border-radius: 3px; white-space: nowrap; letter-spacing: .02em; }
+    .l-note { color: #64748b; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .75rem; }
+
+    .empty { padding: 2rem; text-align: center; color: #94a3b8; font-size: .8125rem; }
+    @media(max-width:1024px){.kpi-row{grid-template-columns:repeat(3,1fr)}.wh-grid,.cols,.chart-row{grid-template-columns:1fr}}
+    @media(max-width:640px){.kpi-row{grid-template-columns:repeat(2,1fr)}}
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script><script>renderNav('dashboard')</script>
+  <div class="page">
+    <div class="page-header"><h1>Dashboard</h1><span class="meta" id="ts"></span></div>
+    <div class="kpi-row" id="kpis"></div>
+    <div class="section-title">Warehouses</div>
+    <div class="wh-grid" id="wh"></div>
+    <div class="section-title">Analytics</div>
+    <div class="chart-row">
+      <div class="chart-panel"><h2>Stock Distribution by Brand</h2><div class="chart-wrap"><canvas id="chartBrand"></canvas></div></div>
+      <div class="chart-panel"><h2>Stock Value by Warehouse</h2><div class="chart-wrap"><canvas id="chartWarehouse"></canvas></div></div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-panel"><h2>Order Volume by Month</h2><div class="chart-wrap"><canvas id="chartOrders"></canvas></div></div>
+      <div class="chart-panel"><h2>Top Products by Orders</h2><div class="chart-wrap"><canvas id="chartTopProducts"></canvas></div></div>
+    </div>
+    <div class="cols">
+      <div class="panel"><div class="panel-head"><h2>Low Stock Alerts</h2><a href="/inventory.html">View all</a></div><div id="alerts"></div></div>
+      <div class="panel"><div class="panel-head"><h2>Recent Activity</h2><a href="/audit.html">View all</a></div><div id="activity"></div></div>
+    </div>
+  </div>
+  <script>
+    const WN={uk:'London',us:'Charleston',eu:'Hanover'};
+    const WR={uk:'UK',us:'US',eu:'DE'};
+    const fm=v=>'£'+Number(v).toLocaleString('en',{maximumFractionDigits:0});
+
+    async function load(){
+      const [kpi,alerts,audit]=await Promise.all([
+        fetch('/api/dashboard/kpis').then(r=>r.json()),
+        fetch('/api/alerts/low-stock').then(r=>r.json()),
+        fetch('/api/audit-log?limit=10').then(r=>r.json()),
+      ]);
+      const now=new Date();
+      document.getElementById('ts').textContent=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})+' · '+now.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+
+      const tu=kpi.warehouses.reduce((s,w)=>s+w.total_units,0);
+      const tv=kpi.warehouses.reduce((s,w)=>s+Number(w.stock_value_gbp),0);
+      const tl=kpi.warehouses.reduce((s,w)=>s+w.low_stock_items,0);
+      const toos=kpi.warehouses.reduce((s,w)=>s+w.out_of_stock_items,0);
+
+      document.getElementById('kpis').innerHTML=
+        kpi_html('Stock Value',fm(tv),'All warehouses',true)+
+        kpi_html('Total Units',tu.toLocaleString(),kpi.warehouses.length+' locations')+
+        kpi_html('Pending Orders',kpi.orders.pending,kpi.orders.in_progress+' in progress')+
+        kpi_html('In Transit',kpi.transfers.units_in_transit,kpi.transfers.in_transit+' transfers')+
+        kpi_html('Low Stock',tl,toos+' out of stock',false,tl>10?'#dc2626':tl>0?'#d97706':null)+
+        kpi_html('Revenue Shipped',fm(kpi.orders.revenue_shipped),kpi.orders.shipped+' orders');
+
+      const mx=Math.max(...kpi.warehouses.map(w=>w.total_units),1);
+      document.getElementById('wh').innerHTML=kpi.warehouses.map(w=>{
+        const pct=Math.round((w.total_units/mx)*100);
+        const bc=w.out_of_stock_items>5?'#ef4444':w.low_stock_items>5?'#f59e0b':'#22c55e';
+        const tc=w.out_of_stock_items>0?'tag-crit':w.low_stock_items>0?'tag-warn':'tag-ok';
+        const tt=w.out_of_stock_items>0?w.out_of_stock_items+' OOS':w.low_stock_items>0?w.low_stock_items+' low':'Healthy';
+        return `<div class="wh"><div class="wh-head"><div><span class="wh-name">${WN[w.warehouse]}</span><span class="wh-region">${WR[w.warehouse]} · ${w.currency}</span></div><span class="wh-tag ${tc}">${tt}</span></div>
+          <div class="wh-bar"><div class="wh-bar-fill" style="width:${pct}%;background:${bc}"></div></div>
+          <div class="wh-stats"><div><div class="wh-stat-l">Units</div><div class="wh-stat-v">${w.total_units.toLocaleString()}</div></div><div><div class="wh-stat-l">Value</div><div class="wh-stat-v">${fm(w.stock_value_gbp)}</div></div><div><div class="wh-stat-l">Low Stock</div><div class="wh-stat-v" style="color:${w.low_stock_items>0?'#d97706':'#16a34a'}">${w.low_stock_items}</div></div></div></div>`;
+      }).join('');
+
+      if(!alerts.length){document.getElementById('alerts').innerHTML='<div class="empty">All stock healthy</div>';}
+      else{document.getElementById('alerts').innerHTML=alerts.slice(0,8).map(a=>{
+        const oos=a.alert_type==='out_of_stock',has=a.surplus_elsewhere?.length;
+        return `<div class="a-row"><span class="a-dot" style="background:${oos?'#ef4444':'#f59e0b'}"></span><span class="a-wh">${a.warehouse.toUpperCase()}</span><span class="a-name">${esc(a.name)}</span><span class="a-qty">${a.qty_on_hand}/${a.reorder_point}</span><span class="a-hint" style="color:${has?'#3b82f6':'#94a3b8'}">${has?'Transfer':'Reorder'}</span></div>`;
+      }).join('');}
+
+      const colors={stock_received:'#dcfce7;#15803d',stock_shipped:'#fee2e2;#b91c1c',stock_transferred_out:'#fef3c7;#a16207',stock_transferred_in:'#dbeafe;#1d4ed8',stock_adjusted:'#f3e8ff;#7c3aed',stock_returned:'#dcfce7;#15803d',order_created:'#dbeafe;#1d4ed8',order_pick:'#fef3c7;#a16207',order_pack:'#dbeafe;#1d4ed8',order_ship:'#dcfce7;#15803d',po_created:'#dbeafe;#1d4ed8',po_submitted:'#dbeafe;#1d4ed8',po_auto_created:'#f3e8ff;#7c3aed',return_created:'#fef3c7;#a16207',transfer_created:'#dbeafe;#1d4ed8'};
+      if(!audit.length){document.getElementById('activity').innerHTML='<div class="empty">No activity yet</div>';}
+      else{document.getElementById('activity').innerHTML=audit.slice(0,8).map(a=>{
+        const t=new Date(a.created_at);const c=(colors[a.action]||'#f1f5f9;#64748b').split(';');
+        return `<div class="l-row"><span class="l-time">${t.toLocaleDateString('en-GB',{day:'numeric',month:'short'})} ${t.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</span><span class="l-tag" style="background:${c[0]};color:${c[1]}">${a.action.replace(/_/g,' ')}</span><span class="l-note">${esc(a.notes||'')}</span></div>`;
+      }).join('');}
+    }
+
+    function kpi_html(label,value,sub,primary,valueColor){
+      return `<div class="kpi${primary?' primary':''}"><div class="kpi-label">${label}</div><div class="kpi-val"${valueColor?` style="color:${valueColor}"`:``}>${value}</div><div class="kpi-sub">${sub}</div></div>`;
+    }
+    function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+    load();setInterval(load,30000);
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script>
+    const BRAND_COLORS = ['#0f172a','#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316'];
+    const WH_COLORS = { uk: '#3b82f6', us: '#ec4899', eu: '#22c55e' };
+    const WH_LABELS = { uk: 'London (UK)', us: 'Charleston (US)', eu: 'Hanover (DE)' };
+    let charts = {};
+
+    Chart.defaults.font.family = "'Inter', sans-serif";
+    Chart.defaults.font.size = 11;
+    Chart.defaults.color = '#64748b';
+
+    async function loadCharts() {
+      const data = await fetch('/api/dashboard/chart-data').then(r => r.json());
+
+      // Stock by Brand — doughnut
+      // API returns: { brand, units (int), value (string) }
+      const brandLabels = data.stockByBrand.map(b => b.brand);
+      const brandValues = data.stockByBrand.map(b => Number(b.units));
+      if (charts.brand) charts.brand.destroy();
+      charts.brand = new Chart(document.getElementById('chartBrand'), {
+        type: 'doughnut',
+        data: {
+          labels: brandLabels,
+          datasets: [{ data: brandValues, backgroundColor: BRAND_COLORS.slice(0, brandLabels.length), borderWidth: 0, hoverOffset: 4 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'right', labels: { boxWidth: 10, padding: 8, font: { size: 11 } } },
+            tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed.toLocaleString()} units` } }
+          }
+        }
+      });
+
+      // Stock Value by Warehouse — bar
+      // API returns: { warehouse, name, units (int), value (string) }
+      const whLabels = data.stockByWarehouse.map(w => WH_LABELS[w.warehouse] || w.warehouse);
+      const whValues = data.stockByWarehouse.map(w => Number(w.value));
+      const whUnits = data.stockByWarehouse.map(w => Number(w.units));
+      if (charts.warehouse) charts.warehouse.destroy();
+      charts.warehouse = new Chart(document.getElementById('chartWarehouse'), {
+        type: 'bar',
+        data: {
+          labels: whLabels,
+          datasets: [
+            { label: 'Value (£)', data: whValues, backgroundColor: data.stockByWarehouse.map(w => WH_COLORS[w.warehouse] || '#94a3b8'), borderRadius: 4, barPercentage: 0.6 },
+            { label: 'Units', data: whUnits, backgroundColor: data.stockByWarehouse.map(w => WH_COLORS[w.warehouse] + '40'), borderRadius: 4, barPercentage: 0.6, yAxisID: 'y1' }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { boxWidth: 10, font: { size: 11 } } } },
+          scales: {
+            y: { beginAtZero: true, ticks: { callback: v => '£' + (v >= 1000 ? Math.round(v/1000) + 'k' : v) }, grid: { color: '#f1f5f9' } },
+            y1: { position: 'right', beginAtZero: true, grid: { display: false }, ticks: { callback: v => v.toLocaleString() } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+
+      // Orders by Month — line
+      if (data.ordersByMonth.length) {
+        const monthLabels = data.ordersByMonth.map(m => {
+          const [y, mo] = m.month.split('-');
+          return new Date(y, mo - 1).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+        });
+        const orderCounts = data.ordersByMonth.map(m => Number(m.order_count));
+        const orderRevenue = data.ordersByMonth.map(m => Number(m.revenue));
+        if (charts.orders) charts.orders.destroy();
+        charts.orders = new Chart(document.getElementById('chartOrders'), {
+          type: 'line',
+          data: {
+            labels: monthLabels,
+            datasets: [
+              { label: 'Orders', data: orderCounts, borderColor: '#3b82f6', backgroundColor: '#3b82f680', tension: 0.3, fill: true, pointRadius: 3, pointHoverRadius: 5 },
+              { label: 'Revenue (£)', data: orderRevenue, borderColor: '#22c55e', backgroundColor: 'transparent', tension: 0.3, pointRadius: 3, pointHoverRadius: 5, yAxisID: 'y1' }
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { boxWidth: 10, font: { size: 11 } } } },
+            scales: {
+              y: { beginAtZero: true, grid: { color: '#f1f5f9' }, title: { display: true, text: 'Orders', font: { size: 10 } } },
+              y1: { position: 'right', beginAtZero: true, grid: { display: false }, ticks: { callback: v => '£' + (v >= 1000 ? Math.round(v/1000) + 'k' : v) }, title: { display: true, text: 'Revenue', font: { size: 10 } } },
+              x: { grid: { display: false } }
+            }
+          }
+        });
+      } else {
+        document.getElementById('chartOrders').parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:260px;color:#94a3b8;font-size:.8125rem">No order data yet</div>';
+      }
+
+      // Top Products — horizontal bar
+      if (data.topProducts.length) {
+        const prodLabels = data.topProducts.map(p => p.name.length > 30 ? p.name.slice(0, 28) + '…' : p.name);
+        const prodValues = data.topProducts.map(p => Number(p.total_ordered));
+        if (charts.topProducts) charts.topProducts.destroy();
+        charts.topProducts = new Chart(document.getElementById('chartTopProducts'), {
+          type: 'bar',
+          data: {
+            labels: prodLabels,
+            datasets: [{ label: 'Units Ordered', data: prodValues, backgroundColor: '#0f172a', borderRadius: 3, barPercentage: 0.7 }]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+              y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+            }
+          }
+        });
+      } else {
+        document.getElementById('chartTopProducts').parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:260px;color:#94a3b8;font-size:.8125rem">No order data yet</div>';
+      }
+    }
+
+    loadCharts(); setInterval(loadCharts, 60000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventory — Fox & Fable WMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a;-webkit-font-smoothing:antialiased}
+    .page{max-width:1440px;margin:0 auto;padding:1.5rem 2rem}
+    h1{font-size:1.5rem;font-weight:700;letter-spacing:-.02em;margin-bottom:1rem}
+    .tabs{display:flex;gap:.5rem;margin-bottom:1rem}
+    .tab{display:flex;align-items:center;gap:.5rem;padding:.5rem 1rem;border-radius:6px;font-size:.8125rem;font-weight:500;cursor:pointer;border:1px solid #e2e8f0;background:#fff;color:#64748b;transition:all 120ms}
+    .tab:hover{border-color:#cbd5e1}
+    .tab.active{background:#0f172a;color:#fff;border-color:#0f172a}
+    .tab .ct{font-size:.6875rem;padding:.1rem .375rem;border-radius:4px;background:rgba(255,255,255,.15)}
+    .tab:not(.active) .ct{background:#f1f5f9;color:#64748b}
+    .controls{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}
+    .controls input,.controls select{padding:.4375rem .75rem;border:1px solid #e2e8f0;border-radius:6px;font-size:.8125rem;font-family:inherit;background:#fff;color:#0f172a}
+    .controls input{width:280px}
+    .controls input:focus,.controls select:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+    .summary{margin-left:auto;font-size:.75rem;color:#94a3b8}
+    .table-wrap{background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden}
+    table{width:100%;border-collapse:collapse}
+    th{text-align:left;padding:.5rem .875rem;font-size:.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;border-bottom:1px solid #e2e8f0;background:#fafbfc}
+    td{padding:.4375rem .875rem;font-size:.8125rem;border-bottom:1px solid #f1f5f9}
+    tr:hover td{background:#f8fafc}
+    .r{text-align:right;font-variant-numeric:tabular-nums}
+    .mono{font-family:ui-monospace,'SF Mono',monospace;font-size:.75rem;color:#94a3b8}
+    .status{display:inline-flex;align-items:center;gap:.375rem;font-size:.6875rem;font-weight:500;padding:.125rem .5rem;border-radius:4px}
+    .s-out{background:#fef2f2;color:#dc2626}.s-low{background:#fffbeb;color:#d97706}.s-ok{background:#f0fdf4;color:#16a34a}
+    .bar-wrap{display:inline-block;width:40px;height:3px;background:#f1f5f9;border-radius:2px;vertical-align:middle;margin-left:.375rem}
+    .bar-fill{display:block;height:100%;border-radius:2px}
+    .loc{font-family:ui-monospace,'SF Mono',monospace;font-size:.6875rem;color:#64748b;background:#f1f5f9;padding:.125rem .375rem;border-radius:3px;cursor:pointer;border:none;letter-spacing:.02em}
+    .loc:hover{background:#e2e8f0;color:#0f172a}
+    .loc-empty{font-size:.6875rem;color:#cbd5e1;cursor:pointer;border:none;background:none}
+    .loc-empty:hover{color:#3b82f6}
+    .adj-btn{font-size:.75rem;color:#3b82f6;background:none;border:none;cursor:pointer;font-weight:500;opacity:0;transition:opacity 100ms}
+    tr:hover .adj-btn{opacity:1}
+    .adj-btn:hover{text-decoration:underline}
+    .overlay{position:fixed;inset:0;background:rgba(15,23,42,.4);display:flex;align-items:center;justify-content:center;z-index:100}
+    .modal{background:#fff;border-radius:8px;padding:1.5rem;width:400px;max-width:95vw;box-shadow:0 20px 40px rgba(0,0,0,.12)}
+    .modal h3{font-size:1rem;font-weight:600;margin-bottom:.25rem}
+    .modal .sub{font-size:.8125rem;color:#64748b;margin-bottom:1rem}
+    .field{margin-bottom:.75rem}
+    .field label{display:block;font-size:.8125rem;font-weight:500;color:#475569;margin-bottom:.25rem}
+    .field input{width:100%;padding:.4375rem .75rem;border:1px solid #e2e8f0;border-radius:6px;font-size:.8125rem;font-family:inherit}
+    .field input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+    .actions{display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem}
+    .btn{padding:.4375rem .875rem;border-radius:6px;font-size:.8125rem;font-weight:500;cursor:pointer;border:none;font-family:inherit}
+    .btn-primary{background:#0f172a;color:#fff}.btn-primary:hover{background:#1e293b}
+    .btn-ghost{background:#fff;color:#64748b;border:1px solid #e2e8f0}.btn-ghost:hover{background:#f8fafc}
+    .price-cell{position:relative;cursor:default}
+    .trend-up{color:#dc2626;font-size:.625rem;margin-left:.25rem}
+    .trend-down{color:#16a34a;font-size:.625rem;margin-left:.25rem}
+    .trend-flat{color:#94a3b8;font-size:.625rem;margin-left:.25rem}
+    .price-pop{position:absolute;right:0;top:100%;z-index:50;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.1);width:320px;padding:0;pointer-events:none;opacity:0;transform:translateY(4px);transition:opacity 150ms,transform 150ms}
+    .price-cell:hover .price-pop{opacity:1;transform:translateY(0);pointer-events:auto}
+    .pop-head{padding:.625rem .75rem;border-bottom:1px solid #f1f5f9}
+    .pop-head-name{font-weight:600;font-size:.75rem;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pop-head-sku{font-family:ui-monospace,monospace;font-size:.625rem;color:#94a3b8}
+    .pop-empty{padding:.75rem;text-align:center;color:#94a3b8;font-size:.75rem}
+    .pop-row{display:flex;align-items:center;gap:.5rem;padding:.375rem .75rem;border-bottom:1px solid #f8fafc;font-size:.6875rem}
+    .pop-row:last-child{border-bottom:none}
+    .pop-row.latest{background:#f0fdf4}
+    .pop-date{color:#94a3b8;font-variant-numeric:tabular-nums;min-width:64px}
+    .pop-field{font-weight:600;min-width:48px}
+    .pop-field.buy{color:#3b82f6}.pop-field.sell{color:#8b5cf6}
+    .pop-vals{flex:1;font-variant-numeric:tabular-nums}
+    .pop-pct{font-weight:600;min-width:40px;text-align:right}
+    .pop-pct.up{color:#dc2626}.pop-pct.down{color:#16a34a}
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script><script>renderNav('inventory')</script>
+  <div class="page">
+    <h1>Inventory</h1>
+    <div class="tabs" id="tabs"></div>
+    <div class="controls">
+      <input type="text" id="search" placeholder="Search by name, SKU, or brand..." />
+      <select id="filter"><option value="">All status</option><option value="low">Low stock</option><option value="out">Out of stock</option><option value="healthy">Healthy</option></select>
+      <span class="summary" id="summary"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Status</th><th>Brand</th><th>Product</th><th>SKU</th><th>Location</th><th class="r">On Hand</th><th class="r">Reserved</th><th class="r">Available</th><th class="r">Reorder Pt</th><th class="r">Buy Cost</th><th class="r">Value</th><th></th></tr></thead>
+        <tbody id="tb"><tr><td colspan="12" style="text-align:center;padding:2rem;color:#94a3b8">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+  <div id="mr"></div>
+  <script>
+    const WN={uk:'London · UK',us:'Charleston · US',eu:'Hanover · DE'};
+    let warehouses=[],active='uk',data=[],priceTrends={},priceCache={};
+
+    async function init(){
+      const [wh, trends]=await Promise.all([
+        fetch('/api/warehouses').then(r=>r.json()),
+        fetch('/api/price-trends').then(r=>r.json()),
+      ]);
+      warehouses=wh;
+      for(const t of trends) priceTrends[t.product_id]=t;
+      renderTabs();loadStock();
+    }
+    function renderTabs(){
+      document.getElementById('tabs').innerHTML=warehouses.map(w=>
+        `<div class="tab${w.code===active?' active':''}" onclick="sw('${w.code}')">${WN[w.code]}<span class="ct">${w.total_units}</span></div>`
+      ).join('');
+    }
+    function sw(c){active=c;renderTabs();loadStock()}
+
+    async function loadStock(){
+      const s=document.getElementById('search').value,f=document.getElementById('filter').value;
+      const p=new URLSearchParams();if(s)p.set('search',s);if(f)p.set('filter',f);
+      data=await fetch(`/api/warehouses/${active}/stock?${p}`).then(r=>r.json());
+      render();
+    }
+    function render(){
+      const low=data.filter(r=>r.stock_status==='low').length,out=data.filter(r=>r.stock_status==='out_of_stock').length;
+      document.getElementById('summary').textContent=`${data.length} products · ${low} low · ${out} out of stock`;
+      if(!data.length){document.getElementById('tb').innerHTML='<tr><td colspan="12" style="text-align:center;padding:2rem;color:#94a3b8">No matching products</td></tr>';return}
+
+      document.getElementById('tb').innerHTML=data.map(r=>{
+        const sc=r.stock_status==='out_of_stock'?'s-out':r.stock_status==='low'?'s-low':'s-ok';
+        const sl=r.stock_status==='out_of_stock'?'Out of stock':r.stock_status==='low'?'Low':'OK';
+        const mx=Math.max(r.qty_on_hand,r.reorder_point,50);
+        const pct=Math.min(100,(r.qty_on_hand/mx)*100);
+        const fc=r.stock_status==='out_of_stock'?'#ef4444':r.stock_status==='low'?'#f59e0b':'#22c55e';
+        const v=(r.qty_on_hand*Number(r.cost_price_gbp)).toFixed(2);
+        const locHtml=r.location
+          ? `<button class="loc" onclick="openLoc('${r.stock_id}',\`${esc(r.name)}\`,\`${esc(r.location)}\`)">${esc(r.location)}</button>`
+          : `<button class="loc-empty" onclick="openLoc('${r.stock_id}',\`${esc(r.name)}\`,'')">+ assign</button>`;
+        return `<tr>
+          <td><span class="status ${sc}">${sl}</span></td>
+          <td style="font-weight:500;color:#475569">${esc(r.brand)}</td>
+          <td>${esc(r.name)}</td>
+          <td class="mono">${esc(r.sku)}</td>
+          <td>${locHtml}</td>
+          <td class="r"><strong>${r.qty_on_hand}</strong><span class="bar-wrap"><span class="bar-fill" style="width:${pct}%;background:${fc}"></span></span></td>
+          <td class="r" style="color:#94a3b8">${r.qty_reserved}</td>
+          <td class="r"><strong>${r.qty_available}</strong></td>
+          <td class="r" style="color:#94a3b8">${r.reorder_point}</td>
+          <td class="r price-cell" onmouseenter="loadPriceHistory(event,'${r.product_id}',\`${esc(r.name)}\`,\`${esc(r.sku)}\`)">${renderPriceCell(r)}</td>
+          <td class="r">£${v}</td>
+          <td><button class="adj-btn" onclick="openAdj('${r.product_id}',\`${esc(r.name)}\`,${r.qty_on_hand})">Adjust</button></td>
+        </tr>`;
+      }).join('');
+    }
+
+    function openAdj(pid,name,cur){
+      document.getElementById('mr').innerHTML=`<div class="overlay" onclick="closeM(event)"><div class="modal" onclick="event.stopPropagation()">
+        <h3>Stock Adjustment</h3><div class="sub">${name} · ${active.toUpperCase()} · Current: ${cur}</div>
+        <div class="field"><label>Adjustment (+/-)</label><input type="number" id="aq" placeholder="e.g. +10 or -5" /></div>
+        <div class="field"><label>Reason</label><input type="text" id="ar" placeholder="Cycle count correction" /></div>
+        <div class="actions"><button class="btn btn-ghost" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="doAdj('${pid}')">Apply</button></div>
+      </div></div>`;
+    }
+    function closeM(e){if(e&&e.target!==e.currentTarget)return;document.getElementById('mr').innerHTML=''}
+    async function doAdj(pid){
+      const q=parseInt(document.getElementById('aq').value);if(!q||isNaN(q))return;
+      await fetch('/api/stock-adjustments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productId:pid,warehouseCode:active,adjustment:q,reason:document.getElementById('ar').value})});
+      closeM();loadStock();
+    }
+    function openLoc(stockId,name,current){
+      document.getElementById('mr').innerHTML=`<div class="overlay" onclick="closeM(event)"><div class="modal" onclick="event.stopPropagation()">
+        <h3>Bin Location</h3><div class="sub">${name} · ${active.toUpperCase()}</div>
+        <div class="field"><label>Location (e.g. A-01-03)</label><input type="text" id="locv" value="${current}" placeholder="Aisle-Rack-Shelf" style="text-transform:uppercase;font-family:ui-monospace,monospace" /></div>
+        <div style="font-size:.6875rem;color:#94a3b8;margin-bottom:.75rem">Format: Aisle letter – Rack number – Shelf number (e.g. A-01-03)</div>
+        <div class="actions"><button class="btn btn-ghost" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="doLoc('${stockId}')">Save</button></div>
+      </div></div>`;
+      document.getElementById('locv').focus();
+    }
+    async function doLoc(stockId){
+      const loc=document.getElementById('locv').value.trim().toUpperCase();
+      await fetch('/api/warehouse-stock/'+stockId+'/location',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:loc||null})});
+      closeM();loadStock();
+    }
+    function renderPriceCell(r){
+      const cost=Number(r.cost_price_gbp);
+      const trend=priceTrends[r.product_id];
+      let arrow='<span class="trend-flat">—</span>';
+      if(trend){
+        const old=Number(trend.old_value),nw=Number(trend.new_value);
+        if(nw>old) arrow='<span class="trend-up">&#9650;</span>';
+        else if(nw<old) arrow='<span class="trend-down">&#9660;</span>';
+      }
+      return `£${cost.toFixed(2)}${arrow}<div class="price-pop" id="pp-${r.product_id}"></div>`;
+    }
+
+    async function loadPriceHistory(e,pid,name,sku){
+      const pop=document.getElementById('pp-'+pid);
+      if(!pop||pop.dataset.loaded)return;
+      pop.dataset.loaded='1';
+      if(!priceCache[pid]){
+        priceCache[pid]=await fetch('/api/products/'+pid+'/price-history').then(r=>r.json());
+      }
+      const hist=priceCache[pid];
+      if(!hist.length){
+        pop.innerHTML=`<div class="pop-head"><div class="pop-head-name">${name}</div><div class="pop-head-sku">${sku}</div></div><div class="pop-empty">No price history</div>`;
+        return;
+      }
+      pop.innerHTML=`<div class="pop-head"><div class="pop-head-name">${name}</div><div class="pop-head-sku">${sku} · ${hist.length} change${hist.length!==1?'s':''}</div></div>`+
+        hist.slice(0,8).map((h,i)=>{
+          const d=new Date(h.changed_at);
+          const ds=d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'});
+          const old=Number(h.old_value),nw=Number(h.new_value);
+          const pct=old>0?((nw-old)/old*100).toFixed(1):'0';
+          const dir=nw>old?'up':'down';
+          const fc=h.field==='buy_cost'?'buy':'sell';
+          const fl=h.field==='buy_cost'?'Buy':'Sell';
+          return `<div class="pop-row${i===0?' latest':''}"><span class="pop-date">${ds}</span><span class="pop-field ${fc}">${fl}</span><span class="pop-vals">£${old.toFixed(2)} → £${nw.toFixed(2)}</span><span class="pop-pct ${dir}">${nw>old?'+':''}${pct}%</span></div>`;
+        }).join('');
+    }
+
+    function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+    document.getElementById('search').addEventListener('input',loadStock);
+    document.getElementById('filter').addEventListener('change',loadStock);
+    init();
+  </script>
+</body>
+</html>

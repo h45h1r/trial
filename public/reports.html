@@ -1,0 +1,36 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Reports — Fox & Fable WMS</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/base.css">
+  <style>.b-fast{background:#f0fdf4;color:#15803d}.b-steady{background:#dbeafe;color:#1d4ed8}.b-slow{background:#fffbeb;color:#a16207}.b-dead{background:#fef2f2;color:#b91c1c}
+    .sum-row td{background:#f1f5f9;font-weight:600}.result{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:.875rem;margin-bottom:.75rem;font-size:.8125rem}
+    .result a{color:#2563eb;text-decoration:none;font-weight:500}.result a:hover{text-decoration:underline}</style></head>
+<body><script src="/nav.js"></script><script>renderNav('reports')</script>
+  <div class="page"><h1 style="margin-bottom:1rem">Reports & Analytics</h1>
+    <div class="tabs"><div class="tab active" onclick="showTab('val')">Stock Valuation</div><div class="tab" onclick="showTab('dem')">Demand Analysis</div><div class="tab" onclick="showTab('reo')">Auto-Reorder</div></div>
+    <div id="ct"></div></div>
+  <script>
+    const WN={uk:'London · UK',us:'Charleston · US',eu:'Hanover · DE'};let cur='val';
+    function showTab(t){cur=t;document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['val','dem','reo'][i]===t));
+      if(t==='val')loadVal();else if(t==='dem')loadDem();else loadReo()}
+
+    async function loadVal(){const d=await fetch('/api/reports/stock-valuation').then(r=>r.json());
+      let h='<div class="tw"><table><thead><tr><th>Warehouse</th><th>Brand</th><th class="r">SKUs</th><th class="r">Units</th><th class="r">Cost Value</th><th class="r">Retail Value</th></tr></thead><tbody>';
+      d.forEach(r=>{const s=!r.brand;h+=`<tr${s?' class="sum-row"':''}><td>${WN[r.warehouse]||r.warehouse}</td><td>${s?'TOTAL':esc(r.brand)}</td><td class="r">${r.sku_count}</td><td class="r">${r.total_units}</td><td class="r">£${Number(r.cost_value).toLocaleString('en',{minimumFractionDigits:2})}</td><td class="r">£${Number(r.retail_value).toLocaleString('en',{minimumFractionDigits:2})}</td></tr>`});
+      h+='</tbody></table></div>';document.getElementById('ct').innerHTML=h}
+
+    async function loadDem(){const d=await fetch('/api/reports/demand').then(r=>r.json());
+      let h='<div class="tw"><table><thead><tr><th>Brand</th><th>Product</th><th>SKU</th><th>Velocity</th><th class="r">Orders</th><th class="r">Units Sold</th><th class="r">Revenue</th><th>Stock</th></tr></thead><tbody>';
+      d.forEach(r=>{const si=r.stock_by_warehouse?r.stock_by_warehouse.map(s=>s.warehouse.toUpperCase()+':'+s.qty).join(' '):'';
+        h+=`<tr><td style="font-weight:500;color:#475569">${esc(r.brand)}</td><td>${esc(r.name)}</td><td class="mono">${r.sku}</td><td><span class="badge b-${r.velocity.replace('_mover','').replace('_stock','')}">${r.velocity.replace('_',' ')}</span></td><td class="r">${r.order_count}</td><td class="r">${r.total_ordered}</td><td class="r">£${Number(r.revenue).toFixed(2)}</td><td class="mono" style="font-size:.6875rem">${si}</td></tr>`});
+      h+='</tbody></table></div>';document.getElementById('ct').innerHTML=h}
+
+    async function loadReo(){document.getElementById('ct').innerHTML=`<p style="color:#64748b;font-size:.8125rem;margin-bottom:1rem">Generate purchase orders for all items below reorder point.</p>
+      <div style="display:flex;gap:.5rem;margin-bottom:1rem"><select id="rw" class="controls" style="padding:.4375rem .75rem;border:1px solid #e2e8f0;border-radius:6px;font-size:.8125rem;font-family:inherit"><option value="uk">London · UK</option><option value="us">Charleston · US</option><option value="eu">Hanover · DE</option></select>
+      <button class="btn btn-dark" onclick="runReo()">Generate POs</button></div><div id="rr"></div>`}
+
+    async function runReo(){const w=document.getElementById('rw').value;
+      const r=await fetch('/api/auto-reorder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({warehouseCode:w})}).then(r=>r.json());
+      if(!r.pos||!r.pos.length){document.getElementById('rr').innerHTML='<p style="color:#94a3b8;font-size:.8125rem">No items below reorder point.</p>';return}
+      document.getElementById('rr').innerHTML=r.pos.map(po=>`<div class="result">Created <strong>${po.poRef}</strong> for <strong>${po.supplier}</strong> — ${po.lineCount} items. <a href="/purchase-orders.html">View POs →</a></div>`).join('')}
+
+    function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+    loadVal();
+  </script></body></html>

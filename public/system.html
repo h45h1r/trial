@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Status — Fox & Fable WMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/base.css">
+  <style>
+    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .75rem; margin-bottom: 1.5rem; }
+    .ov-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.125rem 1.25rem; }
+    .ov-card h3 { font-size: .625rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; margin-bottom: .75rem; }
+    .ov-stat { display: flex; justify-content: space-between; align-items: baseline; padding: .25rem 0; font-size: .8125rem; }
+    .ov-stat .label { color: #64748b; }
+    .ov-stat .val { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    .section-title { font-size: .6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: .75rem; margin-top: .5rem; }
+
+    .endpoints { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 1.5rem; }
+    .ep-row { display: grid; grid-template-columns: 24px 1fr 100px 80px 80px; gap: .75rem; align-items: center; padding: .5rem 1.25rem; border-bottom: 1px solid #f1f5f9; font-size: .8125rem; }
+    .ep-row:last-child { border-bottom: none; }
+    .ep-row.head { font-size: .6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; background: #fafbfc; border-bottom: 1px solid #e2e8f0; }
+    .ep-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .ep-dot.ok { background: #22c55e; box-shadow: 0 0 4px rgba(34,197,94,.4); }
+    .ep-dot.err { background: #ef4444; box-shadow: 0 0 4px rgba(239,68,68,.4); }
+    .ep-dot.pending { background: #e2e8f0; }
+    .ep-path { font-family: ui-monospace, monospace; font-size: .75rem; color: #475569; }
+    .ep-method { font-size: .6875rem; font-weight: 600; padding: .1rem .375rem; border-radius: 3px; background: #dbeafe; color: #1d4ed8; }
+    .ep-status { font-size: .75rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .ep-status.ok { color: #16a34a; }
+    .ep-status.err { color: #dc2626; }
+    .ep-ms { font-size: .6875rem; color: #94a3b8; font-variant-numeric: tabular-nums; }
+
+    .db-table { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 1.5rem; }
+    .db-row { display: grid; grid-template-columns: 1fr 100px 200px; gap: .75rem; align-items: center; padding: .4375rem 1.25rem; border-bottom: 1px solid #f1f5f9; font-size: .8125rem; }
+    .db-row:last-child { border-bottom: none; }
+    .db-row.head { font-size: .6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; background: #fafbfc; border-bottom: 1px solid #e2e8f0; }
+    .db-name { font-family: ui-monospace, monospace; font-size: .75rem; color: #475569; }
+    .db-count { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+    .db-bar-wrap { height: 4px; background: #f1f5f9; border-radius: 2px; }
+    .db-bar { height: 100%; background: #3b82f6; border-radius: 2px; }
+
+    .last-activity { font-size: .75rem; color: #64748b; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: .75rem 1.25rem; display: flex; align-items: center; gap: .5rem; }
+    .pulse { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+
+    .all-ok { display: inline-flex; align-items: center; gap: .375rem; font-size: .8125rem; font-weight: 600; color: #16a34a; margin-bottom: 1.5rem; }
+    .all-ok .dot { width: 10px; height: 10px; border-radius: 50%; background: #22c55e; }
+
+    @media(max-width:768px) { .grid3 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script><script>renderNav('system')</script>
+  <div class="page">
+    <div class="hdr"><h1>System Status</h1><span style="font-size:.75rem;color:#94a3b8" id="ts"></span></div>
+    <div id="statusLine"></div>
+    <div class="grid3" id="overview"><div class="ov-card"><h3>Loading...</h3></div></div>
+    <div class="section-title">API Endpoints</div>
+    <div class="endpoints" id="endpoints"><div class="ep-row" style="justify-content:center;color:#94a3b8;padding:1.5rem">Checking endpoints...</div></div>
+    <div class="section-title">Database Tables</div>
+    <div class="db-table" id="dbTables"><div class="db-row" style="justify-content:center;color:#94a3b8;padding:1.5rem">Loading...</div></div>
+    <div id="lastAct"></div>
+  </div>
+  <script>
+    const ENDPOINTS = [
+      { path: '/api/health', desc: 'Health check' },
+      { path: '/api/warehouses', desc: 'Warehouses' },
+      { path: '/api/stock', desc: 'Stock list (Part 1)' },
+      { path: '/api/suppliers', desc: 'Suppliers' },
+      { path: '/api/products', desc: 'Products' },
+      { path: '/api/customers', desc: 'Customers' },
+      { path: '/api/purchase-orders', desc: 'Purchase Orders' },
+      { path: '/api/transfers', desc: 'Stock Transfers' },
+      { path: '/api/fulfilment', desc: 'Fulfilment / Orders' },
+      { path: '/api/returns', desc: 'Returns' },
+      { path: '/api/audit-log?limit=1', desc: 'Audit Log' },
+      { path: '/api/alerts/low-stock', desc: 'Low Stock Alerts' },
+      { path: '/api/dashboard/kpis', desc: 'Dashboard KPIs' },
+      { path: '/api/dashboard/chart-data', desc: 'Chart Data' },
+      { path: '/api/pricing', desc: 'Pricing' },
+      { path: '/api/reports/stock-valuation', desc: 'Stock Valuation Report' },
+      { path: '/api/reports/demand', desc: 'Demand Report' },
+      { path: '/api/backorders', desc: 'Backorders (legacy)' },
+      { path: '/api/stretch/summary', desc: 'Stretch Summary (legacy)' },
+      { path: '/api/cycle-counts', desc: 'Cycle Counts' },
+    ];
+
+    async function load() {
+      const now = new Date();
+      document.getElementById('ts').textContent = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' · ' + now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+
+      // Fetch overview data
+      const [kpis, suppliers, products, audit] = await Promise.all([
+        fetch('/api/dashboard/kpis').then(r => r.json()).catch(() => null),
+        fetch('/api/suppliers').then(r => r.json()).catch(() => []),
+        fetch('/api/products').then(r => r.json()).catch(() => []),
+        fetch('/api/audit-log?limit=1').then(r => r.json()).catch(() => []),
+      ]);
+
+      // Overview cards
+      const totalUnits = kpis ? kpis.warehouses.reduce((s, w) => s + w.total_units, 0) : 0;
+      const totalValue = kpis ? kpis.warehouses.reduce((s, w) => s + Number(w.stock_value_gbp), 0) : 0;
+      const lowAlerts = kpis ? kpis.lowStockAlerts : 0;
+
+      document.getElementById('overview').innerHTML = `
+        <div class="ov-card">
+          <h3>Inventory</h3>
+          ${ovStat('Products', products.length)}
+          ${ovStat('Total Units', totalUnits.toLocaleString())}
+          ${ovStat('Stock Value', '£' + Math.round(totalValue).toLocaleString())}
+          ${ovStat('Low Stock Alerts', lowAlerts)}
+        </div>
+        <div class="ov-card">
+          <h3>Operations</h3>
+          ${ovStat('Warehouses', kpis ? kpis.warehouses.length : 3)}
+          ${ovStat('Suppliers', suppliers.length)}
+          ${ovStat('Pending Orders', kpis ? kpis.orders.pending : '—')}
+          ${ovStat('In-Transit Transfers', kpis ? kpis.transfers.in_transit : '—')}
+        </div>
+        <div class="ov-card">
+          <h3>Warehouse Breakdown</h3>
+          ${kpis ? kpis.warehouses.map(w => ovStat(w.name, w.total_units.toLocaleString() + ' units')).join('') : ovStat('Loading...', '—')}
+        </div>`;
+
+      // Last activity
+      if (audit.length) {
+        const t = new Date(audit[0].created_at);
+        const ago = timeAgo(t);
+        document.getElementById('lastAct').innerHTML = `<div class="last-activity"><span class="pulse"></span> Last activity: <strong>${esc(audit[0].action.replace(/_/g, ' '))}</strong> — ${esc(audit[0].notes || '—')} <span style="color:#94a3b8;margin-left:auto">${ago}</span></div>`;
+      }
+
+      // Check all endpoints
+      checkEndpoints();
+
+      // Estimate table sizes from API responses
+      renderDbTables(kpis, suppliers, products, audit);
+    }
+
+    function ovStat(label, val) {
+      return `<div class="ov-stat"><span class="label">${label}</span><span class="val">${val}</span></div>`;
+    }
+
+    async function checkEndpoints() {
+      // Show pending state
+      document.getElementById('endpoints').innerHTML = `
+        <div class="ep-row head"><div></div><div>Endpoint</div><div>Description</div><div style="text-align:right">Status</div><div style="text-align:right">Latency</div></div>
+        ${ENDPOINTS.map(ep => `<div class="ep-row" id="ep-${css(ep.path)}">
+          <div><span class="ep-dot pending"></span></div>
+          <div class="ep-path">${esc(ep.path.split('?')[0])}</div>
+          <div style="color:#64748b;font-size:.75rem">${ep.desc}</div>
+          <div class="ep-status" style="text-align:right">...</div>
+          <div class="ep-ms" style="text-align:right">—</div>
+        </div>`).join('')}`;
+
+      let allOk = true;
+      const results = await Promise.all(ENDPOINTS.map(async ep => {
+        const start = performance.now();
+        try {
+          const r = await fetch(ep.path);
+          const ms = Math.round(performance.now() - start);
+          return { path: ep.path, ok: r.ok, status: r.status, ms };
+        } catch (e) {
+          return { path: ep.path, ok: false, status: 0, ms: 0 };
+        }
+      }));
+
+      results.forEach(r => {
+        const el = document.getElementById('ep-' + css(r.path));
+        if (!el) return;
+        const dot = el.querySelector('.ep-dot');
+        const statusEl = el.querySelectorAll('div')[3];
+        const msEl = el.querySelectorAll('div')[4];
+        dot.className = 'ep-dot ' + (r.ok ? 'ok' : 'err');
+        statusEl.className = 'ep-status ' + (r.ok ? 'ok' : 'err');
+        statusEl.textContent = r.status || 'ERR';
+        statusEl.style.textAlign = 'right';
+        msEl.textContent = r.ms + 'ms';
+        if (!r.ok) allOk = false;
+      });
+
+      document.getElementById('statusLine').innerHTML = allOk
+        ? '<div class="all-ok"><span class="dot"></span> All systems operational</div>'
+        : '<div class="all-ok" style="color:#dc2626"><span class="dot" style="background:#ef4444"></span> Some endpoints have issues</div>';
+    }
+
+    function renderDbTables(kpis, suppliers, products, audit) {
+      // We can estimate row counts from what we know
+      const tables = [
+        { name: 'products', count: products.length },
+        { name: 'warehouse_stock', count: products.length * 3 },
+        { name: 'warehouses', count: kpis ? kpis.warehouses.length : 3 },
+        { name: 'suppliers', count: suppliers.length },
+      ];
+
+      // Fetch additional counts from list endpoints
+      Promise.all([
+        fetch('/api/customers').then(r => r.json()).then(d => ({ name: 'customers', count: d.length })).catch(() => ({ name: 'customers', count: '?' })),
+        fetch('/api/purchase-orders').then(r => r.json()).then(d => ({ name: 'purchase_orders', count: d.length })).catch(() => ({ name: 'purchase_orders', count: '?' })),
+        fetch('/api/transfers').then(r => r.json()).then(d => ({ name: 'stock_transfers', count: d.length })).catch(() => ({ name: 'stock_transfers', count: '?' })),
+        fetch('/api/fulfilment').then(r => r.json()).then(d => ({ name: 'orders', count: d.length })).catch(() => ({ name: 'orders', count: '?' })),
+        fetch('/api/returns').then(r => r.json()).then(d => ({ name: 'returns', count: d.length })).catch(() => ({ name: 'returns', count: '?' })),
+        fetch('/api/audit-log?limit=1000').then(r => r.json()).then(d => ({ name: 'audit_log', count: d.length + (d.length >= 1000 ? '+' : '') })).catch(() => ({ name: 'audit_log', count: '?' })),
+        fetch('/api/cycle-counts').then(r => r.json()).then(d => ({ name: 'cycle_counts', count: d.length })).catch(() => ({ name: 'cycle_counts', count: '?' })),
+      ]).then(extra => {
+        const all = [...tables, ...extra];
+        const maxCount = Math.max(...all.map(t => typeof t.count === 'number' ? t.count : 0), 1);
+
+        document.getElementById('dbTables').innerHTML = `
+          <div class="db-row head"><div>Table</div><div style="text-align:right">Rows</div><div>Distribution</div></div>
+          ${all.map(t => {
+            const c = typeof t.count === 'number' ? t.count : t.count;
+            const pct = typeof t.count === 'number' ? Math.max(1, Math.round((t.count / maxCount) * 100)) : 2;
+            return `<div class="db-row">
+              <div class="db-name">${t.name}</div>
+              <div class="db-count">${typeof c === 'number' ? c.toLocaleString() : c}</div>
+              <div><div class="db-bar-wrap"><div class="db-bar" style="width:${pct}%"></div></div></div>
+            </div>`;
+          }).join('')}`;
+      });
+    }
+
+    function timeAgo(date) {
+      const s = Math.floor((Date.now() - date.getTime()) / 1000);
+      if (s < 60) return 'just now';
+      if (s < 3600) return Math.floor(s / 60) + 'm ago';
+      if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+      return Math.floor(s / 86400) + 'd ago';
+    }
+
+    function css(path) { return path.replace(/[^a-zA-Z0-9]/g, '-'); }
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    load();
+  </script>
+</body>
+</html>

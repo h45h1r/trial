@@ -1,0 +1,23 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Stock List — Fox & Fable WMS</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/base.css">
+  <style>.b-ukus{background:#f0fdf4;color:#15803d}.b-ukonly{background:#dbeafe;color:#1d4ed8}.b-usonly{background:#fce7f3;color:#be185d}.b-none{background:#f1f5f9;color:#94a3b8}.margin{color:#16a34a;font-weight:600}</style></head>
+<body><script src="/nav.js"></script><script>renderNav('stock')</script>
+  <div class="page"><h1 style="margin-bottom:1rem">Stock List</h1>
+    <div class="controls"><input type="text" id="search" placeholder="Search by title, brand, SKU, or EAN..."/><select id="bf"><option value="">All Brands</option></select>
+      <select id="rf"><option value="">All Regions</option><option value="uk">UK Only</option><option value="us">US Only</option><option value="both">Both UK & US</option></select><span class="summary" id="ct"></span></div>
+    <div class="tw" style="overflow-x:auto"><table><thead><tr><th>Brand</th><th>Title</th><th>SKU</th><th>EAN</th><th>ASIN</th><th class="r">RRP (£)</th><th class="r">Buy Cost</th><th class="r">Margin</th><th class="r">Case Pack</th><th>Region</th></tr></thead>
+    <tbody id="tb"><tr><td colspan="10" class="empty">Loading...</td></tr></tbody></table></div></div>
+  <script>
+    let all=[];
+    async function load(){const r=await fetch('/api/stock');all=await r.json();
+      const brands=[...new Set(all.map(r=>r.brand))].sort();const sel=document.getElementById('bf');brands.forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b;sel.appendChild(o)});render()}
+    function render(){const q=document.getElementById('search').value.toLowerCase(),brand=document.getElementById('bf').value,region=document.getElementById('rf').value;
+      let f=all.filter(r=>{if(q&&!r.title.toLowerCase().includes(q)&&!r.brand.toLowerCase().includes(q)&&!(r.sku||'').toLowerCase().includes(q)&&!(r.ean||'').includes(q))return false;if(brand&&r.brand!==brand)return false;
+        if(region==='uk'&&!r.available_uk)return false;if(region==='us'&&!r.available_us)return false;if(region==='both'&&!(r.available_uk&&r.available_us))return false;return true});
+      document.getElementById('ct').textContent=f.length+' of '+all.length+' items';
+      if(!f.length){document.getElementById('tb').innerHTML='<tr><td colspan="10" class="empty">No matching items</td></tr>';return}
+      document.getElementById('tb').innerHTML=f.map(r=>{const rrp=parseFloat(r.rrp_gbp)||0,cost=parseFloat(r.buy_cost_gbp)||0;const m=rrp>0?((rrp-cost)/rrp*100).toFixed(1):'—';
+        const rb=r.available_uk&&r.available_us?'<span class="badge b-ukus">UK + US</span>':r.available_uk?'<span class="badge b-ukonly">UK</span>':r.available_us?'<span class="badge b-usonly">US</span>':'<span class="badge b-none">—</span>';
+        return `<tr><td style="font-weight:500;color:#475569">${esc(r.brand)}</td><td>${esc(r.title)}</td><td class="mono">${esc(r.sku||'')}</td><td class="mono">${esc(r.ean||'')}</td><td class="mono">${esc(r.asin||'')}</td><td class="r">£${rrp.toFixed(2)}</td><td class="r">£${cost.toFixed(2)}</td><td class="r margin">${m}%</td><td class="r">${r.case_pack||''}</td><td>${rb}</td></tr>`}).join('')}
+    function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+    document.getElementById('search').addEventListener('input',render);document.getElementById('bf').addEventListener('change',render);document.getElementById('rf').addEventListener('change',render);load();
+  </script></body></html>

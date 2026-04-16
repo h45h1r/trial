@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Packing Slip — Fox & Fable WMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/base.css">
+  <style>
+    .slip { max-width: 800px; margin: 0 auto; padding: 2rem; }
+    .slip-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 2px solid #0f172a; }
+    .company-name { font-size: 1.375rem; font-weight: 700; letter-spacing: -.02em; color: #0f172a; }
+    .company-sub { font-size: .75rem; color: #64748b; margin-top: .25rem; line-height: 1.5; }
+    .doc-title { font-size: 1.125rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; text-align: right; color: #0f172a; }
+    .doc-ref { font-size: .8125rem; color: #64748b; margin-top: .25rem; text-align: right; }
+
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+    .info-block h3 { font-size: .625rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; margin-bottom: .375rem; }
+    .info-block p { font-size: .8125rem; line-height: 1.6; color: #0f172a; }
+
+    .items-table { width: 100%; border-collapse: collapse; margin-bottom: 2rem; }
+    .items-table th { text-align: left; padding: .625rem .75rem; font-size: .6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #64748b; border-bottom: 2px solid #0f172a; background: none; }
+    .items-table td { padding: .5rem .75rem; font-size: .8125rem; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+    .items-table tr:last-child td { border-bottom: none; }
+    .items-table .r { text-align: right; font-variant-numeric: tabular-nums; }
+    .items-table .sku { font-family: ui-monospace, monospace; font-size: .75rem; color: #64748b; }
+    .items-table .prod { font-weight: 500; }
+    .items-table .brand { font-size: .6875rem; color: #94a3b8; }
+
+    .check-col { width: 50px; text-align: center; }
+    .checkbox { display: inline-block; width: 16px; height: 16px; border: 1.5px solid #94a3b8; border-radius: 3px; }
+
+    .totals-row { border-top: 2px solid #0f172a; }
+    .totals-row td { font-weight: 600; padding-top: .75rem; }
+
+    .footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0; }
+    .sig-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2rem; margin-top: 1.5rem; }
+    .sig-block { }
+    .sig-label { font-size: .6875rem; font-weight: 500; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; margin-bottom: .5rem; }
+    .sig-line { border-bottom: 1px solid #94a3b8; height: 2rem; }
+
+    .notes-block { margin-top: 1.5rem; padding: .75rem; background: #f8fafc; border-radius: 6px; font-size: .75rem; color: #64748b; }
+    .notes-block strong { color: #475569; }
+
+    .print-bar { text-align: center; margin-bottom: 1.5rem; padding: 1rem; }
+    .print-btn { padding: .5rem 1.5rem; background: #0f172a; color: #fff; border: none; border-radius: 6px; font-size: .875rem; font-weight: 600; font-family: inherit; cursor: pointer; }
+    .print-btn:hover { background: #1e293b; }
+
+    .err { text-align: center; padding: 3rem; color: #94a3b8; font-size: .875rem; }
+
+    @media print {
+      nav, .print-bar { display: none !important; }
+      body { background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .slip { padding: 0; max-width: 100%; }
+      .checkbox { border-color: #0f172a; }
+      @page { margin: 1.5cm; size: A4; }
+    }
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script><script>renderNav('')</script>
+  <div class="print-bar" id="printBar" style="display:none">
+    <button class="print-btn" onclick="window.print()">Print Packing Slip</button>
+    <span style="display:block;font-size:.75rem;color:#94a3b8;margin-top:.375rem">or press Ctrl+P / Cmd+P</span>
+  </div>
+  <div class="slip" id="slip"><div class="err">Loading packing slip...</div></div>
+  <script>
+    const ADDRESSES = {
+      uk: 'Unit 7, Thames Wharf\nRainville Road\nLondon W6 9HA\nUnited Kingdom',
+      us: '340 Concord Street\nSuite 200\nCharleston, SC 29401\nUnited States',
+      eu: 'Podbielskistraße 166\n30177 Hanover\nGermany'
+    };
+
+    async function load() {
+      const params = new URLSearchParams(window.location.search);
+      const orderId = params.get('orderId');
+      if (!orderId) {
+        document.getElementById('slip').innerHTML = '<div class="err">No order ID provided. Use ?orderId=xxx</div>';
+        return;
+      }
+
+      try {
+        const resp = await fetch('/api/orders/' + orderId + '/packing-slip');
+        if (!resp.ok) throw new Error('Order not found');
+        const data = await resp.json();
+        render(data);
+        document.getElementById('printBar').style.display = '';
+      } catch (e) {
+        document.getElementById('slip').innerHTML = '<div class="err">Could not load order: ' + esc(e.message) + '</div>';
+      }
+    }
+
+    function render(data) {
+      const o = data.order;
+      const lines = data.lines;
+      const wh = o.warehouse_code || 'uk';
+      const addr = ADDRESSES[wh] || ADDRESSES.uk;
+      const date = new Date(o.created_at);
+      const fmtDate = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      const totalUnits = lines.reduce((s, l) => s + (l.qty_ordered || 0), 0);
+
+      document.title = 'Packing Slip — ' + o.order_ref;
+
+      document.getElementById('slip').innerHTML = `
+        <div class="slip-header">
+          <div>
+            <div class="company-name">Fox & Fable Toy Sellers</div>
+            <div class="company-sub">${addr.replace(/\n/g, '<br>')}</div>
+          </div>
+          <div>
+            <div class="doc-title">Packing Slip</div>
+            <div class="doc-ref">${esc(o.order_ref)}<br>${fmtDate}</div>
+          </div>
+        </div>
+
+        <div class="info-grid">
+          <div class="info-block">
+            <h3>Ship To</h3>
+            <p>
+              <strong>${esc(o.company_name || o.customer_name || '—')}</strong><br>
+              ${o.billing_address ? esc(o.billing_address).replace(/\n/g, '<br>') : '<span style="color:#94a3b8">No address on file</span>'}
+              ${o.email ? '<br><span style="color:#64748b">' + esc(o.email) + '</span>' : ''}
+            </p>
+          </div>
+          <div class="info-block">
+            <h3>Order Details</h3>
+            <p>
+              <strong>Order:</strong> ${esc(o.order_ref)}<br>
+              <strong>Date:</strong> ${fmtDate}<br>
+              <strong>Warehouse:</strong> ${wh.toUpperCase()}<br>
+              <strong>Currency:</strong> ${esc(o.currency || 'GBP')}<br>
+              <strong>Status:</strong> ${esc(o.fulfilment_status || o.status || '—')}
+            </p>
+          </div>
+        </div>
+
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th style="width:30px">#</th>
+              <th>Product</th>
+              <th>SKU</th>
+              <th class="r">Qty</th>
+              <th class="check-col">Picked</th>
+              <th class="check-col">Packed</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${lines.map((l, i) => `
+              <tr>
+                <td style="color:#94a3b8;font-size:.75rem">${i + 1}</td>
+                <td>
+                  <div class="prod">${esc(l.product_name || '—')}</div>
+                  ${l.brand ? '<div class="brand">' + esc(l.brand) + '</div>' : ''}
+                </td>
+                <td class="sku">${esc(l.sku || '—')}</td>
+                <td class="r" style="font-weight:600;font-size:.9375rem">${l.qty_ordered || 0}</td>
+                <td class="check-col"><span class="checkbox"></span></td>
+                <td class="check-col"><span class="checkbox"></span></td>
+              </tr>
+            `).join('')}
+            <tr class="totals-row">
+              <td></td>
+              <td>Total Items: ${lines.length} line${lines.length !== 1 ? 's' : ''}</td>
+              <td></td>
+              <td class="r">${totalUnits}</td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+
+        ${o.notes ? '<div class="notes-block"><strong>Notes:</strong> ' + esc(o.notes) + '</div>' : ''}
+
+        <div class="footer">
+          <div style="font-size:.6875rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:.5rem">Warehouse Verification</div>
+          <div class="sig-grid">
+            <div class="sig-block">
+              <div class="sig-label">Packed by</div>
+              <div class="sig-line"></div>
+            </div>
+            <div class="sig-block">
+              <div class="sig-label">Signature</div>
+              <div class="sig-line"></div>
+            </div>
+            <div class="sig-block">
+              <div class="sig-label">Date</div>
+              <div class="sig-line"></div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    load();
+  </script>
+</body>
+</html>

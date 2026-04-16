@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Detail — Fox & Fable WMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/base.css">
+  <style>
+    .back-link { font-size: .8125rem; color: #64748b; text-decoration: none; display: inline-flex; align-items: center; gap: .25rem; margin-bottom: 1rem; }
+    .back-link:hover { color: #0f172a; }
+
+    .order-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem; }
+    .order-ref { font-size: 1.5rem; font-weight: 700; letter-spacing: -.02em; }
+    .order-meta { font-size: .8125rem; color: #64748b; margin-top: .25rem; }
+    .head-actions { display: flex; gap: .5rem; align-items: center; }
+
+    .status-badge { display: inline-flex; align-items: center; padding: .25rem .75rem; border-radius: 5px; font-size: .75rem; font-weight: 600; }
+    .st-confirmed { background: #dbeafe; color: #1d4ed8; }
+    .st-picking, .st-picked { background: #fffbeb; color: #a16207; }
+    .st-packing, .st-packed { background: #f3e8ff; color: #7c3aed; }
+    .st-shipped { background: #f0fdf4; color: #15803d; }
+
+    .progress-track { display: flex; align-items: center; gap: 0; margin-bottom: 1.5rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; }
+    .step { flex: 1; text-align: center; position: relative; }
+    .step-dot { width: 28px; height: 28px; border-radius: 50%; background: #f1f5f9; border: 2px solid #e2e8f0; display: inline-flex; align-items: center; justify-content: center; font-size: .6875rem; font-weight: 700; color: #94a3b8; margin-bottom: .375rem; transition: all 200ms; }
+    .step.done .step-dot { background: #0f172a; border-color: #0f172a; color: #fff; }
+    .step.active .step-dot { background: #3b82f6; border-color: #3b82f6; color: #fff; box-shadow: 0 0 0 4px rgba(59,130,246,.15); }
+    .step-label { font-size: .6875rem; font-weight: 500; color: #94a3b8; }
+    .step.done .step-label, .step.active .step-label { color: #0f172a; }
+    .step-line { position: absolute; top: 14px; left: 50%; right: -50%; height: 2px; background: #e2e8f0; z-index: 0; }
+    .step.done .step-line { background: #0f172a; }
+    .step:last-child .step-line { display: none; }
+
+    .info-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .75rem; margin-bottom: 1.5rem; }
+    .info-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.25rem; }
+    .info-card h3 { font-size: .625rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; margin-bottom: .5rem; }
+    .info-card p { font-size: .8125rem; line-height: 1.7; }
+    .info-card strong { font-weight: 600; }
+
+    .lines-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+    .lines-head { padding: .875rem 1.25rem; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; }
+    .lines-head h2 { font-size: .875rem; font-weight: 600; }
+
+    .err { text-align: center; padding: 4rem 2rem; color: #94a3b8; font-size: .875rem; }
+
+    @media(max-width:768px) { .info-cards { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script><script>renderNav('fulfilment')</script>
+  <div class="page" id="content"><div class="err">Loading order...</div></div>
+  <script>
+    const STEPS = ['confirmed', 'picking', 'picked', 'packing', 'packed', 'shipped'];
+    const STEP_LABELS = { confirmed: 'Confirmed', picking: 'Picking', picked: 'Picked', packing: 'Packing', packed: 'Packed', shipped: 'Shipped' };
+    const WN = { uk: 'London (UK)', us: 'Charleston (US)', eu: 'Hanover (DE)' };
+
+    async function load() {
+      const params = new URLSearchParams(window.location.search);
+      const orderId = params.get('orderId');
+      if (!orderId) {
+        document.getElementById('content').innerHTML = '<div class="err">No order ID provided. Use ?orderId=xxx</div>';
+        return;
+      }
+
+      try {
+        const resp = await fetch('/api/orders/' + orderId + '/packing-slip');
+        if (!resp.ok) throw new Error('Order not found');
+        const data = await resp.json();
+        render(data, orderId);
+      } catch (e) {
+        document.getElementById('content').innerHTML = '<div class="err">Could not load order: ' + esc(e.message) + '</div>';
+      }
+    }
+
+    function render(data, orderId) {
+      const o = data.order;
+      const lines = data.lines;
+      const date = new Date(o.created_at);
+      const fmtDate = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      const fs = o.fulfilment_status || 'confirmed';
+      const stClass = 'st-' + fs;
+      const currentIdx = STEPS.indexOf(fs);
+      const totalQty = lines.reduce((s, l) => s + (l.qty_ordered || 0), 0);
+      const totalValue = lines.reduce((s, l) => s + (l.qty_ordered || 0) * Number(l.unit_price_gbp || 0), 0);
+
+      document.title = o.order_ref + ' — Fox & Fable WMS';
+
+      document.getElementById('content').innerHTML = `
+        <a href="/fulfilment.html" class="back-link">&larr; Back to Fulfilment</a>
+        <div class="order-head">
+          <div>
+            <div class="order-ref">${esc(o.order_ref)}</div>
+            <div class="order-meta">${fmtDate} &middot; ${esc(o.company_name || o.customer_name || '—')} &middot; ${WN[o.warehouse_code] || o.warehouse_code}</div>
+          </div>
+          <div class="head-actions">
+            <span class="status-badge ${stClass}">${STEP_LABELS[fs] || fs}</span>
+            <a href="/packing-slip.html?orderId=${orderId}" class="btn btn-dark" style="text-decoration:none;color:#fff;display:inline-flex;align-items:center;gap:.375rem">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              Print Packing Slip
+            </a>
+          </div>
+        </div>
+
+        <div class="progress-track">
+          ${STEPS.map((step, i) => {
+            const isDone = i < currentIdx;
+            const isActive = i === currentIdx;
+            const cls = isDone ? 'step done' : isActive ? 'step active' : 'step';
+            const icon = isDone ? '&#10003;' : (i + 1);
+            return `<div class="${cls}">
+              <div class="step-line"></div>
+              <div class="step-dot">${icon}</div>
+              <div class="step-label">${STEP_LABELS[step]}</div>
+            </div>`;
+          }).join('')}
+        </div>
+
+        <div class="info-cards">
+          <div class="info-card">
+            <h3>Customer</h3>
+            <p>
+              <strong>${esc(o.company_name || o.customer_name || '—')}</strong><br>
+              ${o.billing_address ? esc(o.billing_address).replace(/\n/g, '<br>') : '<span style="color:#94a3b8">No address</span>'}
+              ${o.email ? '<br>' + esc(o.email) : ''}
+            </p>
+          </div>
+          <div class="info-card">
+            <h3>Order Summary</h3>
+            <p>
+              <strong>Reference:</strong> ${esc(o.order_ref)}<br>
+              <strong>Lines:</strong> ${lines.length}<br>
+              <strong>Total Units:</strong> ${totalQty}<br>
+              <strong>Value:</strong> £${totalValue.toFixed(2)}
+            </p>
+          </div>
+          <div class="info-card">
+            <h3>Fulfilment</h3>
+            <p>
+              <strong>Warehouse:</strong> ${WN[o.warehouse_code] || o.warehouse_code}<br>
+              <strong>Currency:</strong> ${esc(o.currency || 'GBP')}<br>
+              <strong>Status:</strong> ${STEP_LABELS[fs] || fs}<br>
+              ${o.notes ? '<strong>Notes:</strong> ' + esc(o.notes) : '<span style="color:#94a3b8">No notes</span>'}
+            </p>
+          </div>
+        </div>
+
+        <div class="lines-card">
+          <div class="lines-head">
+            <h2>Order Lines</h2>
+            <span style="font-size:.75rem;color:#94a3b8">${lines.length} item${lines.length !== 1 ? 's' : ''} &middot; ${totalQty} units</span>
+          </div>
+          <table>
+            <thead><tr><th style="width:30px">#</th><th>Product</th><th>SKU</th><th class="r">Unit Price</th><th class="r">Qty</th><th class="r">Line Total</th></tr></thead>
+            <tbody>
+              ${lines.map((l, i) => {
+                const lineTotal = (l.qty_ordered || 0) * Number(l.unit_price_gbp || 0);
+                return `<tr>
+                  <td style="color:#94a3b8;font-size:.75rem">${i + 1}</td>
+                  <td>
+                    <div style="font-weight:500">${esc(l.product_name || '—')}</div>
+                    ${l.brand ? '<div style="font-size:.6875rem;color:#94a3b8">' + esc(l.brand) + '</div>' : ''}
+                  </td>
+                  <td class="mono">${esc(l.sku || '—')}</td>
+                  <td class="r">£${Number(l.unit_price_gbp || 0).toFixed(2)}</td>
+                  <td class="r" style="font-weight:600">${l.qty_ordered || 0}</td>
+                  <td class="r" style="font-weight:600">£${lineTotal.toFixed(2)}</td>
+                </tr>`;
+              }).join('')}
+              <tr style="border-top:2px solid #0f172a">
+                <td></td><td></td><td></td>
+                <td class="r" style="font-weight:600">Total</td>
+                <td class="r" style="font-weight:600">${totalQty}</td>
+                <td class="r" style="font-weight:700;font-size:.9375rem">£${totalValue.toFixed(2)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    load();
+  </script>
+</body>
+</html>

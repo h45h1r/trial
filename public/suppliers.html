@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suppliers — Fox & Fable WMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/base.css">
+  <style>
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: .75rem; }
+    .scard { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; transition: border-color 120ms; }
+    .scard:hover { border-color: #cbd5e1; }
+    .scard-head { padding: 1.125rem 1.25rem; cursor: pointer; display: flex; justify-content: space-between; align-items: flex-start; }
+    .scard-name { font-size: .9375rem; font-weight: 600; color: #0f172a; }
+    .scard-email { font-size: .75rem; color: #64748b; margin-top: .125rem; }
+    .scard-meta { display: flex; gap: .75rem; margin-top: .625rem; font-size: .6875rem; color: #94a3b8; }
+    .scard-meta strong { color: #0f172a; font-weight: 600; }
+    .scard-badge { font-size: .6875rem; font-weight: 600; padding: .125rem .5rem; border-radius: 4px; white-space: nowrap; }
+    .scard-expand { max-height: 0; overflow: hidden; transition: max-height 300ms ease; }
+    .scard.open .scard-expand { max-height: 2000px; }
+    .scard-products { border-top: 1px solid #e2e8f0; }
+    .scard-products table { width: 100%; border-collapse: collapse; }
+    .scard-products th { text-align: left; padding: .375rem .875rem; font-size: .625rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; background: #fafbfc; border-bottom: 1px solid #e2e8f0; }
+    .scard-products td { padding: .375rem .875rem; font-size: .75rem; border-bottom: 1px solid #f1f5f9; }
+    .scard-products tr:last-child td { border-bottom: none; }
+    .scard-products .r { text-align: right; font-variant-numeric: tabular-nums; }
+    .scard-products .mono { font-family: ui-monospace, monospace; font-size: .6875rem; color: #94a3b8; }
+    .chevron { transition: transform 200ms; color: #94a3b8; font-size: .75rem; }
+    .scard.open .chevron { transform: rotate(180deg); }
+    .scard-loading { padding: 1.5rem; text-align: center; color: #94a3b8; font-size: .8125rem; }
+    .cur-gbp { background: #dbeafe; color: #1d4ed8; }
+    .cur-usd { background: #fce7f3; color: #be185d; }
+    .cur-eur { background: #f0fdf4; color: #15803d; }
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script><script>renderNav('suppliers')</script>
+  <div class="page">
+    <div class="hdr">
+      <h1>Suppliers</h1>
+      <button class="btn btn-dark" onclick="openNew()">Add Supplier</button>
+    </div>
+    <div class="cards" id="cards"><div class="empty" style="grid-column:1/-1;background:#fff;border:1px solid #e2e8f0;border-radius:8px">Loading suppliers...</div></div>
+  </div>
+  <div id="mr"></div>
+  <script>
+    let suppliers = [];
+    const productCache = {};
+
+    async function load() {
+      suppliers = await fetch('/api/suppliers').then(r => r.json());
+      render();
+    }
+
+    function render() {
+      if (!suppliers.length) {
+        document.getElementById('cards').innerHTML = '<div class="empty" style="grid-column:1/-1;background:#fff;border:1px solid #e2e8f0;border-radius:8px">No suppliers yet</div>';
+        return;
+      }
+      document.getElementById('cards').innerHTML = suppliers.map(s => {
+        const cc = (s.currency || 'GBP').toLowerCase();
+        const curClass = 'cur-' + cc;
+        return `<div class="scard" id="sc-${s.id}">
+          <div class="scard-head" onclick="toggle('${s.id}')">
+            <div>
+              <div class="scard-name">${esc(s.name)}</div>
+              ${s.contact_email ? '<div class="scard-email">' + esc(s.contact_email) + '</div>' : ''}
+              <div class="scard-meta">
+                <span>Products: <strong>${s.product_count}</strong></span>
+                <span>Lead time: <strong>${s.lead_time_days}d</strong></span>
+                <span><span class="scard-badge ${curClass}">${(s.currency || 'GBP').toUpperCase()}</span></span>
+              </div>
+            </div>
+            <span class="chevron">&#9660;</span>
+          </div>
+          <div class="scard-expand">
+            <div class="scard-products" id="sp-${s.id}">
+              <div class="scard-loading">Click to load products...</div>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    async function toggle(id) {
+      const el = document.getElementById('sc-' + id);
+      const isOpen = el.classList.contains('open');
+      // Close all
+      document.querySelectorAll('.scard.open').forEach(c => c.classList.remove('open'));
+      if (isOpen) return;
+
+      el.classList.add('open');
+
+      // Load products if not cached
+      if (!productCache[id]) {
+        document.getElementById('sp-' + id).innerHTML = '<div class="scard-loading">Loading products...</div>';
+        productCache[id] = await fetch('/api/products?supplier=' + id).then(r => r.json());
+      }
+
+      const products = productCache[id];
+      if (!products.length) {
+        document.getElementById('sp-' + id).innerHTML = '<div class="scard-loading">No products from this supplier</div>';
+        return;
+      }
+
+      document.getElementById('sp-' + id).innerHTML = `
+        <table>
+          <thead><tr><th>Product</th><th>SKU</th><th class="r">Cost (£)</th><th class="r">Sell (£)</th><th class="r">Margin</th><th class="r">Case Pack</th></tr></thead>
+          <tbody>
+            ${products.map(p => {
+              const cost = Number(p.cost_price_gbp);
+              const sell = Number(p.sell_price_gbp);
+              const margin = sell > 0 ? ((sell - cost) / sell * 100).toFixed(1) : '—';
+              return `<tr>
+                <td style="font-weight:500">${esc(p.name)}</td>
+                <td class="mono">${esc(p.sku)}</td>
+                <td class="r">£${cost.toFixed(2)}</td>
+                <td class="r">£${sell.toFixed(2)}</td>
+                <td class="r" style="color:${Number(margin) > 15 ? '#16a34a' : Number(margin) > 0 ? '#d97706' : '#94a3b8'}">${margin}%</td>
+                <td class="r">${p.case_pack || 1}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    function openNew() {
+      document.getElementById('mr').innerHTML = `<div class="overlay" onclick="closeM(event)"><div class="modal" onclick="event.stopPropagation()">
+        <h3>Add Supplier</h3>
+        <div class="field"><label>Company Name *</label><input type="text" id="sn" placeholder="e.g. Hasbro Trading" /></div>
+        <div class="field"><label>Contact Email</label><input type="email" id="se" placeholder="trade@example.com" /></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+          <div class="field"><label>Lead Time (days)</label><input type="number" id="sl" value="14" min="1" /></div>
+          <div class="field"><label>Currency</label><select id="sc"><option value="GBP">GBP</option><option value="USD">USD</option><option value="EUR">EUR</option></select></div>
+        </div>
+        <div class="field"><label>Notes</label><textarea id="snotes" placeholder="Optional notes..."></textarea></div>
+        <div class="actions"><button class="btn btn-ghost" onclick="closeM()">Cancel</button><button class="btn btn-dark" onclick="createSupplier()">Create</button></div>
+      </div></div>`;
+      document.getElementById('sn').focus();
+    }
+
+    async function createSupplier() {
+      const name = document.getElementById('sn').value.trim();
+      if (!name) { document.getElementById('sn').style.borderColor = '#ef4444'; return; }
+      const body = {
+        name,
+        contactEmail: document.getElementById('se').value.trim() || undefined,
+        leadTimeDays: parseInt(document.getElementById('sl').value) || 14,
+        currency: document.getElementById('sc').value,
+        notes: document.getElementById('snotes').value.trim() || undefined
+      };
+      await fetch('/api/suppliers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      closeM();
+      load();
+    }
+
+    function closeM(e) { if (e && e.target !== e.currentTarget) return; document.getElementById('mr').innerHTML = ''; }
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    load();
+  </script>
+</body>
+</html>

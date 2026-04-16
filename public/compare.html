@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Warehouse Comparison — Fox & Fable WMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/base.css">
+  <style>
+    .summary-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-bottom: 1.5rem; background: #e2e8f0; border-radius: 8px; overflow: hidden; }
+    .sum-card { padding: 1rem 1.25rem; background: #fff; }
+    .sum-label { font-size: .625rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: .25rem; }
+    .sum-val { font-size: 1.375rem; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+    .sum-sub { font-size: .6875rem; color: #94a3b8; margin-top: .125rem; }
+
+    .controls { display: flex; gap: .75rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+    .controls input { padding: .4375rem .75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: .8125rem; font-family: inherit; width: 260px; background: #fff; }
+    .controls input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
+    .controls select { padding: .4375rem .75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: .8125rem; font-family: inherit; background: #fff; }
+    .controls select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
+    .ctrl-count { margin-left: auto; font-size: .75rem; color: #94a3b8; }
+
+    .tw { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 800px; }
+    th { text-align: left; padding: .5rem .875rem; font-size: .6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; border-bottom: 1px solid #e2e8f0; background: #fafbfc; cursor: pointer; user-select: none; white-space: nowrap; }
+    th:hover { color: #475569; }
+    th .arr { font-size: .5rem; margin-left: .25rem; opacity: .4; }
+    th.sorted .arr { opacity: 1; color: #0f172a; }
+    td { padding: .4375rem .875rem; font-size: .8125rem; border-bottom: 1px solid #f1f5f9; }
+    tr:hover td { background: #f8fafc; }
+    .r { text-align: right; font-variant-numeric: tabular-nums; }
+    .mono { font-family: ui-monospace, monospace; font-size: .6875rem; color: #94a3b8; }
+
+    .stock-cell { font-weight: 600; font-variant-numeric: tabular-nums; padding: .25rem .5rem; border-radius: 4px; display: inline-block; min-width: 36px; text-align: center; font-size: .75rem; }
+    .sc-ok { background: #f0fdf4; color: #16a34a; }
+    .sc-low { background: #fffbeb; color: #d97706; }
+    .sc-out { background: #fef2f2; color: #dc2626; }
+    .sc-na { background: #f8fafc; color: #cbd5e1; }
+
+    .imbalance { background: #fffbeb; }
+    .imbalance td { background: #fffbeb; }
+    .imbalance:hover td { background: #fef3c7; }
+    .imb-icon { font-size: .625rem; color: #d97706; margin-left: .25rem; }
+
+    tfoot td { font-weight: 700; border-top: 2px solid #0f172a; background: #fafbfc; }
+
+    .legend { display: flex; gap: 1rem; margin-top: .75rem; font-size: .6875rem; color: #64748b; align-items: center; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: .25rem; vertical-align: middle; }
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script><script>renderNav('compare')</script>
+  <div class="page">
+    <div class="hdr"><h1>Warehouse Comparison</h1></div>
+    <div class="summary-row" id="summary"></div>
+    <div class="controls">
+      <input type="text" id="search" placeholder="Search product, SKU, brand..." oninput="renderTable()" />
+      <select id="brandFilter" onchange="renderTable()"><option value="">All brands</option></select>
+      <select id="statusFilter" onchange="renderTable()">
+        <option value="">All status</option>
+        <option value="imbalance">Imbalances only</option>
+        <option value="out_any">Out of stock (any)</option>
+        <option value="low_any">Low stock (any)</option>
+        <option value="healthy_all">Healthy everywhere</option>
+      </select>
+      <span class="ctrl-count" id="count"></span>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th onclick="sort('name')">Product <span class="arr">&#9650;</span></th>
+          <th onclick="sort('sku')">SKU <span class="arr">&#9650;</span></th>
+          <th onclick="sort('brand')">Brand <span class="arr">&#9650;</span></th>
+          <th class="r" onclick="sort('uk')">UK (London) <span class="arr">&#9650;</span></th>
+          <th class="r" onclick="sort('us')">US (Charleston) <span class="arr">&#9650;</span></th>
+          <th class="r" onclick="sort('eu')">EU (Hanover) <span class="arr">&#9650;</span></th>
+          <th class="r" onclick="sort('total')">Total <span class="arr">&#9650;</span></th>
+          <th>Status</th>
+        </tr></thead>
+        <tbody id="tb"><tr><td colspan="8" class="empty">Loading stock data...</td></tr></tbody>
+        <tfoot id="tf"></tfoot>
+      </table>
+    </div>
+    <div class="legend">
+      <span><span class="legend-dot" style="background:#dcfce7"></span> Healthy</span>
+      <span><span class="legend-dot" style="background:#fef3c7"></span> Low stock</span>
+      <span><span class="legend-dot" style="background:#fee2e2"></span> Out of stock</span>
+      <span><span class="legend-dot" style="background:#fffbeb;border:1px solid #fcd34d"></span> Imbalance (0 in one, 20+ in another)</span>
+    </div>
+  </div>
+  <script>
+    let products = []; // merged data
+    let sortCol = 'name', sortDir = 1;
+
+    async function load() {
+      const [uk, us, eu] = await Promise.all([
+        fetch('/api/warehouses/uk/stock').then(r => r.json()),
+        fetch('/api/warehouses/us/stock').then(r => r.json()),
+        fetch('/api/warehouses/eu/stock').then(r => r.json()),
+      ]);
+
+      // Merge by product_id
+      const map = {};
+      const process = (arr, wh) => {
+        arr.forEach(s => {
+          if (!map[s.product_id]) {
+            map[s.product_id] = { id: s.product_id, name: s.name, sku: s.sku, brand: s.brand, uk: null, us: null, eu: null, uk_rp: 0, us_rp: 0, eu_rp: 0 };
+          }
+          map[s.product_id][wh] = s.qty_available;
+          map[s.product_id][wh + '_hand'] = s.qty_on_hand;
+          map[s.product_id][wh + '_rp'] = s.reorder_point;
+        });
+      };
+      process(uk, 'uk'); process(us, 'us'); process(eu, 'eu');
+      products = Object.values(map);
+
+      // Compute totals and flags
+      products.forEach(p => {
+        p.uk_val = p.uk ?? 0;
+        p.us_val = p.us ?? 0;
+        p.eu_val = p.eu ?? 0;
+        p.total = p.uk_val + p.us_val + p.eu_val;
+        p.uk_status = cellStatus(p.uk_hand ?? p.uk_val, p.uk_rp);
+        p.us_status = cellStatus(p.us_hand ?? p.us_val, p.us_rp);
+        p.eu_status = cellStatus(p.eu_hand ?? p.eu_val, p.eu_rp);
+        p.imbalance = isImbalance(p);
+      });
+
+      // Populate brand filter
+      const brands = [...new Set(products.map(p => p.brand))].sort();
+      const bf = document.getElementById('brandFilter');
+      brands.forEach(b => { const o = document.createElement('option'); o.value = b; o.textContent = b; bf.appendChild(o); });
+
+      // Summary
+      const sumUk = products.reduce((s, p) => s + p.uk_val, 0);
+      const sumUs = products.reduce((s, p) => s + p.us_val, 0);
+      const sumEu = products.reduce((s, p) => s + p.eu_val, 0);
+      const imb = products.filter(p => p.imbalance).length;
+      document.getElementById('summary').innerHTML =
+        `<div class="sum-card"><div class="sum-label">UK (London)</div><div class="sum-val">${sumUk.toLocaleString()}</div><div class="sum-sub">units available</div></div>` +
+        `<div class="sum-card"><div class="sum-label">US (Charleston)</div><div class="sum-val">${sumUs.toLocaleString()}</div><div class="sum-sub">units available</div></div>` +
+        `<div class="sum-card"><div class="sum-label">EU (Hanover)</div><div class="sum-val">${sumEu.toLocaleString()}</div><div class="sum-sub">units available</div></div>` +
+        `<div class="sum-card${imb > 0 ? ' style="background:#fffbeb"' : ''}"><div class="sum-label">Imbalances</div><div class="sum-val" style="color:${imb > 0 ? '#d97706' : '#16a34a'}">${imb}</div><div class="sum-sub">products with stock mismatch</div></div>`;
+
+      renderTable();
+    }
+
+    function cellStatus(qty, rp) {
+      if (qty === null || qty === undefined) return 'na';
+      if (qty === 0) return 'out';
+      if (rp > 0 && qty <= rp) return 'low';
+      return 'ok';
+    }
+
+    function isImbalance(p) {
+      const vals = [p.uk_val, p.us_val, p.eu_val];
+      const hasZero = vals.some(v => v === 0);
+      const hasSurplus = vals.some(v => v >= 20);
+      return hasZero && hasSurplus;
+    }
+
+    function sort(col) {
+      if (sortCol === col) sortDir *= -1;
+      else { sortCol = col; sortDir = 1; }
+      renderTable();
+    }
+
+    function renderTable() {
+      const q = document.getElementById('search').value.toLowerCase();
+      const brand = document.getElementById('brandFilter').value;
+      const sf = document.getElementById('statusFilter').value;
+
+      let filtered = products;
+      if (q) filtered = filtered.filter(p => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q));
+      if (brand) filtered = filtered.filter(p => p.brand === brand);
+      if (sf === 'imbalance') filtered = filtered.filter(p => p.imbalance);
+      if (sf === 'out_any') filtered = filtered.filter(p => p.uk_val === 0 || p.us_val === 0 || p.eu_val === 0);
+      if (sf === 'low_any') filtered = filtered.filter(p => p.uk_status === 'low' || p.us_status === 'low' || p.eu_status === 'low');
+      if (sf === 'healthy_all') filtered = filtered.filter(p => p.uk_status === 'ok' && p.us_status === 'ok' && p.eu_status === 'ok');
+
+      // Sort
+      filtered.sort((a, b) => {
+        let av, bv;
+        if (sortCol === 'name') { av = a.name; bv = b.name; }
+        else if (sortCol === 'sku') { av = a.sku; bv = b.sku; }
+        else if (sortCol === 'brand') { av = a.brand; bv = b.brand; }
+        else if (sortCol === 'uk') { av = a.uk_val; bv = b.uk_val; }
+        else if (sortCol === 'us') { av = a.us_val; bv = b.us_val; }
+        else if (sortCol === 'eu') { av = a.eu_val; bv = b.eu_val; }
+        else if (sortCol === 'total') { av = a.total; bv = b.total; }
+        else { av = a.name; bv = b.name; }
+        if (typeof av === 'string') return av.localeCompare(bv) * sortDir;
+        return (av - bv) * sortDir;
+      });
+
+      document.getElementById('count').textContent = filtered.length + ' products';
+
+      if (!filtered.length) {
+        document.getElementById('tb').innerHTML = '<tr><td colspan="8" class="empty">No matching products</td></tr>';
+        document.getElementById('tf').innerHTML = '';
+        return;
+      }
+
+      document.getElementById('tb').innerHTML = filtered.map(p => {
+        const rowClass = p.imbalance ? ' class="imbalance"' : '';
+        const statuses = [p.uk_status, p.us_status, p.eu_status];
+        const worstStatus = statuses.includes('out') ? 'Out of stock' : statuses.includes('low') ? 'Low stock' : 'Healthy';
+        const wsColor = statuses.includes('out') ? '#dc2626' : statuses.includes('low') ? '#d97706' : '#16a34a';
+        return `<tr${rowClass}>
+          <td style="font-weight:500">${esc(p.name)}${p.imbalance ? '<span class="imb-icon" title="Stock imbalance">&#9888;</span>' : ''}</td>
+          <td class="mono">${esc(p.sku)}</td>
+          <td style="color:#475569;font-size:.75rem">${esc(p.brand)}</td>
+          <td class="r">${stockCell(p.uk_val, p.uk_status)}</td>
+          <td class="r">${stockCell(p.us_val, p.us_status)}</td>
+          <td class="r">${stockCell(p.eu_val, p.eu_status)}</td>
+          <td class="r" style="font-weight:700">${p.total}</td>
+          <td><span style="color:${wsColor};font-size:.6875rem;font-weight:600">${worstStatus}</span></td>
+        </tr>`;
+      }).join('');
+
+      // Footer totals
+      const tUk = filtered.reduce((s, p) => s + p.uk_val, 0);
+      const tUs = filtered.reduce((s, p) => s + p.us_val, 0);
+      const tEu = filtered.reduce((s, p) => s + p.eu_val, 0);
+      const tAll = tUk + tUs + tEu;
+      document.getElementById('tf').innerHTML = `<tr>
+        <td colspan="3">Totals (${filtered.length} products)</td>
+        <td class="r">${tUk.toLocaleString()}</td>
+        <td class="r">${tUs.toLocaleString()}</td>
+        <td class="r">${tEu.toLocaleString()}</td>
+        <td class="r">${tAll.toLocaleString()}</td>
+        <td></td>
+      </tr>`;
+
+      // Highlight sorted column header
+      document.querySelectorAll('th').forEach(th => th.classList.remove('sorted'));
+    }
+
+    function stockCell(val, status) {
+      const cls = 'stock-cell sc-' + status;
+      return `<span class="${cls}">${val}</span>`;
+    }
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    load();
+  </script>
+</body>
+</html>

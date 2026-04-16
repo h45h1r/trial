@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fulfilment — Fox & Fable WMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a;-webkit-font-smoothing:antialiased}
+    .page{max-width:1440px;margin:0 auto;padding:1.5rem 2rem}
+    .hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem}
+    h1{font-size:1.5rem;font-weight:700;letter-spacing:-.02em}
+    .sub{font-size:.8125rem;color:#94a3b8;margin-top:.125rem}
+    .btn{padding:.4375rem .875rem;border-radius:6px;font-size:.8125rem;font-weight:500;cursor:pointer;border:none;font-family:inherit}
+    .btn-dark{background:#0f172a;color:#fff}.btn-dark:hover{background:#1e293b}
+    .btn-ghost{background:#fff;color:#64748b;border:1px solid #e2e8f0}.btn-ghost:hover{background:#f8fafc}
+    .btn-sm{padding:.25rem .625rem;font-size:.75rem}
+    .btn-amber{background:#d97706;color:#fff}.btn-blue{background:#2563eb;color:#fff}.btn-green{background:#16a34a;color:#fff}
+    .pipeline{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem}
+    .stage{display:flex;flex-direction:column}
+    .stage-hdr{display:flex;align-items:center;gap:.5rem;margin-bottom:.625rem}
+    .stage-dot{width:8px;height:8px;border-radius:50%}
+    .stage-label{font-size:.8125rem;font-weight:600}
+    .stage-ct{margin-left:auto;font-size:.6875rem;font-weight:500;background:#f1f5f9;padding:.1rem .375rem;border-radius:4px;color:#64748b}
+    .stage-body{flex:1;min-height:180px;display:flex;flex-direction:column;gap:.5rem}
+    .card{background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:.875rem}
+    .card:hover{box-shadow:0 2px 8px rgba(0,0,0,.04)}
+    .card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:.375rem}
+    .card-ref{font-family:ui-monospace,monospace;font-size:.75rem;font-weight:600;color:#334155}
+    .card-wh{font-size:.625rem;font-weight:600;padding:.1rem .375rem;border-radius:3px;background:#f1f5f9;color:#64748b}
+    .card-cust{font-size:.8125rem;font-weight:500;margin-bottom:.375rem}
+    .card-meta{display:flex;gap:.75rem;font-size:.6875rem;color:#94a3b8;margin-bottom:.5rem}
+    .card-btn{width:100%;padding:.375rem;font-size:.75rem;font-weight:600;border:none;border-radius:4px;cursor:pointer;color:#fff;font-family:inherit}
+    .empty-lane{flex:1;display:flex;align-items:center;justify-content:center;border:1px dashed #e2e8f0;border-radius:6px;color:#cbd5e1;font-size:.8125rem;min-height:120px}
+    .overlay{position:fixed;inset:0;background:rgba(15,23,42,.4);display:flex;align-items:center;justify-content:center;z-index:100}
+    .modal{background:#fff;border-radius:8px;padding:1.5rem;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 40px rgba(0,0,0,.12)}
+    .modal h3{font-size:1rem;font-weight:600;margin-bottom:1rem}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem}
+    .field{margin-bottom:.75rem}.field label{display:block;font-size:.8125rem;font-weight:500;color:#475569;margin-bottom:.25rem}
+    .field select,.field input{width:100%;padding:.4375rem .75rem;border:1px solid #e2e8f0;border-radius:6px;font-size:.8125rem;font-family:inherit;background:#fff}
+    .field select:focus,.field input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+    .lines{border:1px solid #e2e8f0;border-radius:6px;padding:.75rem;margin-bottom:.5rem}
+    .line{display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;font-size:.8125rem}
+    .line:last-child{margin-bottom:0}
+    .line select{flex:2;padding:.375rem;border:1px solid #e2e8f0;border-radius:4px;font-size:.8125rem;font-family:inherit}
+    .line input{width:70px;padding:.375rem;border:1px solid #e2e8f0;border-radius:4px;font-size:.8125rem;text-align:right;font-family:inherit}
+    .line .rm{color:#ef4444;cursor:pointer;font-size:1rem;background:none;border:none;padding:0 .25rem}
+    .add-line{font-size:.8125rem;color:#3b82f6;cursor:pointer;background:none;border:none;font-weight:500;font-family:inherit;margin-bottom:.75rem}
+    .actions{display:flex;gap:.5rem;justify-content:flex-end}
+    .review-bar{background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:1rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;gap:.75rem}
+    .review-bar.empty{display:none}
+    .review-icon{width:32px;height:32px;border-radius:50%;background:#fef3c7;display:flex;align-items:center;justify-content:center;font-size:.875rem;flex-shrink:0}
+    .review-text{flex:1;font-size:.8125rem;color:#92400e}
+    .review-text strong{color:#78350f}
+    .review-cards{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem}
+    .rcard{background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:.75rem;min-width:200px;flex:1;max-width:300px;cursor:pointer;transition:border-color 120ms}
+    .rcard:hover{border-color:#f59e0b}
+    .rcard-ref{font-family:ui-monospace,monospace;font-size:.75rem;font-weight:600;color:#334155}
+    .rcard-cust{font-size:.8125rem;font-weight:500;margin-top:.125rem}
+    .rcard-issue{font-size:.6875rem;color:#d97706;margin-top:.25rem}
+    .rmodal{width:640px}
+    .rline{border:1px solid #e2e8f0;border-radius:6px;padding:.75rem;margin-bottom:.5rem}
+    .rline-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}
+    .rline-name{font-weight:600;font-size:.8125rem}
+    .rline-sku{font-family:ui-monospace,monospace;font-size:.6875rem;color:#94a3b8}
+    .rline-stock{display:flex;gap:.75rem;font-size:.75rem;margin-bottom:.5rem;color:#64748b}
+    .rline-stock strong{color:#0f172a}
+    .rline-avail{font-weight:700;font-size:.8125rem}
+    .rline-avail.full{color:#16a34a}.rline-avail.partial{color:#d97706}.rline-avail.none{color:#dc2626}
+    .rline-opts{display:flex;gap:.5rem;flex-wrap:wrap}
+    .ropt{display:flex;align-items:center;gap:.375rem;padding:.375rem .625rem;border:1px solid #e2e8f0;border-radius:5px;font-size:.75rem;cursor:pointer;background:#fff;transition:all 100ms}
+    .ropt:hover{border-color:#cbd5e1}
+    .ropt.sel{border-color:#0f172a;background:#0f172a;color:#fff}
+    .ropt input[type=radio]{display:none}
+    .ropt-custom-input{width:50px;padding:.125rem .375rem;border:1px solid #e2e8f0;border-radius:3px;font-size:.75rem;text-align:center;font-family:inherit}
+    .nav-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;border-radius:8px;background:#dc2626;color:#fff;font-size:.5625rem;font-weight:700;margin-left:.25rem;padding:0 .25rem}
+    @media(max-width:1024px){.pipeline{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:640px){.pipeline{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script><script>renderNav('fulfilment')</script>
+  <div class="page">
+    <div class="hdr"><div><h1>Order Fulfilment</h1><div class="sub">Progress orders through pick, pack, ship</div></div><button class="btn btn-dark" onclick="openNew()">+ New Order</button></div>
+    <div class="review-bar empty" id="reviewBar">
+      <div class="review-icon">!</div>
+      <div><div class="review-text"><strong id="reviewCount">0</strong> order(s) need fulfilment review — stock is insufficient for full quantities</div>
+      <div class="review-cards" id="reviewCards"></div></div>
+    </div>
+    <div class="pipeline" id="pl"><div style="text-align:center;padding:2rem;color:#94a3b8;grid-column:1/-1">Loading...</div></div>
+  </div>
+  <div id="mr"></div>
+  <script>
+    const WH={uk:'UK',us:'US',eu:'DE'};
+    let customers=[],products=[],reviewOrders=[];
+    async function init(){[customers,products]=await Promise.all([fetch('/api/customers').then(r=>r.json()),fetch('/api/products').then(r=>r.json())]);loadOrders();loadReviews()}
+
+    async function loadOrders(){
+      const orders=await fetch('/api/fulfilment').then(r=>r.json());
+      const stages=[
+        {key:'confirmed',label:'Confirmed',dot:'#94a3b8',btn:'Start Pick',action:'pick',bc:'#d97706'},
+        {key:'picking',extra:'picked',label:'Picking',dot:'#f59e0b',btn:'Pack',action:'pack',bc:'#2563eb'},
+        {key:'packing',extra:'packed',label:'Packing',dot:'#3b82f6',btn:'Ship',action:'ship',bc:'#16a34a'},
+        {key:'shipped',label:'Shipped',dot:'#22c55e'},
+      ];
+      document.getElementById('pl').innerHTML=stages.map(s=>{
+        const so=orders.filter(o=>o.fulfilment_status===s.key||(s.extra&&o.fulfilment_status===s.extra));
+        return `<div class="stage"><div class="stage-hdr"><span class="stage-dot" style="background:${s.dot}"></span><span class="stage-label">${s.label}</span><span class="stage-ct">${so.length}</span></div>
+          <div class="stage-body">${so.length?so.map(o=>{
+            const d=new Date(o.created_at);
+            return `<div class="card"><div class="card-top"><span class="card-ref">${o.order_ref}</span><span class="card-wh">${WH[o.warehouse_code]||o.warehouse_code||'—'}</span></div>
+              <div class="card-cust">${esc(o.customer_name||'Walk-in')}</div>
+              <div class="card-meta"><span>${o.total_units} units</span><span>£${Number(o.total_gbp).toFixed(2)}</span><span>${d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</span></div>
+              ${s.btn?`<button class="card-btn" style="background:${s.bc}" onclick="prog('${o.id}','${s.action}')">${s.btn}</button>`:''}
+            </div>`;
+          }).join(''):'<div class="empty-lane">No orders</div>'}</div></div>`;
+      }).join('');
+    }
+
+    async function prog(id,action){const r=await fetch(`/api/fulfilment/${id}/${action}`,{method:'PATCH'});const d=await r.json();if(d.error)alert(d.error);loadOrders()}
+
+    let li=0;
+    function openNew(){
+      li=0;
+      document.getElementById('mr').innerHTML=`<div class="overlay" onclick="closeM(event)"><div class="modal" onclick="event.stopPropagation()">
+        <h3>New Order</h3>
+        <div class="form-row"><div class="field"><label>Customer</label><select id="oc">${customers.map(c=>`<option value="${c.id}" data-name="${esc(c.company_name)}">${c.company_name}</option>`).join('')}${!customers.length?'<option value="">No customers</option>':''}</select></div>
+        <div class="field"><label>Fulfil from</label><select id="ow"><option value="uk">London · UK</option><option value="us">Charleston · US</option><option value="eu">Hanover · DE</option></select></div></div>
+        <div class="field"><label>Line items</label></div>
+        <div class="lines" id="lns">${mkLine()}</div>
+        <button class="add-line" onclick="addLn()">+ Add item</button>
+        <div class="actions"><button class="btn btn-ghost" onclick="closeM()">Cancel</button><button class="btn btn-dark" onclick="createOrd()">Create Order</button></div>
+      </div></div>`;
+    }
+    function mkLine(){const i=li++;return `<div class="line"><select id="lp-${i}"><option value="">Select product...</option>${products.map(p=>`<option value="${p.id}" data-name="${esc(p.name)}" data-sku="${p.sku}" data-price="${p.sell_price_gbp}">${p.brand} — ${p.name}</option>`).join('')}</select><input type="number" id="lq-${i}" placeholder="Qty" min="1" value="1"/><input type="number" id="lr-${i}" placeholder="Price" step="0.01"/><button class="rm" onclick="this.parentElement.remove()">×</button></div>`}
+    function addLn(){document.getElementById('lns').insertAdjacentHTML('beforeend',mkLine())}
+    document.addEventListener('change',e=>{if(e.target.id?.startsWith('lp-')){const i=e.target.id.split('-')[1];const o=e.target.selectedOptions[0];if(o?.dataset.price)document.getElementById(`lr-${i}`).value=o.dataset.price}});
+
+    async function createOrd(){
+      const cs=document.getElementById('oc'),wh=document.getElementById('ow').value,lines=[];
+      document.querySelectorAll('#lns>.line').forEach(el=>{const s=el.querySelector('select'),q=el.querySelectorAll('input')[0],p=el.querySelectorAll('input')[1],o=s.selectedOptions[0];
+        if(s.value&&q.value)lines.push({productId:s.value,productName:o?.dataset.name||'',sku:o?.dataset.sku||'',qtyOrdered:parseInt(q.value),unitPriceGbp:parseFloat(p.value)||0})});
+      if(!lines.length)return alert('Add items');
+      await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customerId:cs.value,customerName:cs.selectedOptions[0]?.dataset.name||'',warehouseCode:wh,lines})});
+      closeM();loadOrders();
+    }
+    function closeM(e){if(e&&e.target!==e.currentTarget)return;document.getElementById('mr').innerHTML=''}
+
+    async function loadReviews(){
+      reviewOrders=await fetch('/api/fulfilment/review').then(r=>r.json());
+      const bar=document.getElementById('reviewBar');
+      if(!reviewOrders.length){bar.classList.add('empty');return}
+      bar.classList.remove('empty');
+      document.getElementById('reviewCount').textContent=reviewOrders.length;
+      document.getElementById('reviewCards').innerHTML=reviewOrders.map(o=>{
+        const issues=o.lines.filter(l=>(l.qty_available||0)<(l.qty_requested||l.qty_ordered));
+        return `<div class="rcard" onclick="openReview('${o.id}')">
+          <div class="rcard-ref">${o.order_ref} <span class="card-wh">${WH[o.warehouse_code]||'—'}</span></div>
+          <div class="rcard-cust">${esc(o.company_name||o.customer_name||'—')}</div>
+          <div class="rcard-issue">${issues.length} line${issues.length!==1?'s':''} with insufficient stock</div>
+        </div>`;
+      }).join('');
+    }
+
+    function openReview(orderId){
+      const o=reviewOrders.find(r=>r.id===orderId);
+      if(!o)return;
+      document.getElementById('mr').innerHTML=`<div class="overlay" onclick="closeM(event)"><div class="modal rmodal" onclick="event.stopPropagation()">
+        <h3>Review Order ${esc(o.order_ref)}</h3>
+        <div style="font-size:.75rem;color:#64748b;margin-bottom:1rem">${esc(o.company_name||o.customer_name||'—')} · ${WH[o.warehouse_code]||o.warehouse_code} · £${Number(o.total_gbp).toFixed(2)}</div>
+        <div id="rlines">${o.lines.map((l,i)=>{
+          const req=l.qty_requested||l.qty_ordered;
+          const av=l.qty_available||0;
+          const cls=av>=req?'full':av>0?'partial':'none';
+          const tag=av>=req?'Fully available':av>0?`${av} of ${req} available`:'None available';
+          return `<div class="rline" id="rl-${i}">
+            <div class="rline-head"><div><div class="rline-name">${esc(l.product_name)}</div><div class="rline-sku">${esc(l.sku||'')}</div></div><span class="rline-avail ${cls}">${tag}</span></div>
+            <div class="rline-stock"><span>Requested: <strong>${req}</strong></span><span>Available: <strong>${av}</strong></span><span>Unit price: <strong>£${Number(l.unit_price_gbp).toFixed(2)}</strong></span></div>
+            <div class="rline-opts">
+              <label class="ropt${av>=req?' sel':''}" onclick="selOpt(this,${i},'ship_available')"><input type="radio" name="rd-${i}" value="ship_available" ${av>=req?'checked':''}/>Ship available (${Math.min(req,av)})</label>
+              <label class="ropt" onclick="selOpt(this,${i},'custom')"><input type="radio" name="rd-${i}" value="custom"/>Custom: <input type="number" class="ropt-custom-input" id="rcq-${i}" min="0" max="${av}" value="${Math.min(req,av)}" onclick="event.stopPropagation()"/></label>
+              <label class="ropt" onclick="selOpt(this,${i},'hold')"><input type="radio" name="rd-${i}" value="hold"/>Hold for full qty</label>
+            </div>
+            <input type="hidden" id="rld-${i}" value="${av>=req?'ship_available':''}"/>
+            <input type="hidden" id="rli-${i}" value="${l.line_id}"/>
+          </div>`;
+        }).join('')}</div>
+        <div class="actions" style="margin-top:1rem"><button class="btn btn-ghost" onclick="closeM()">Cancel</button><button class="btn btn-dark" onclick="submitReview('${o.id}',${o.lines.length})">Confirm Decisions</button></div>
+      </div></div>`;
+    }
+
+    function selOpt(el,idx,val){
+      el.closest('.rline-opts').querySelectorAll('.ropt').forEach(o=>o.classList.remove('sel'));
+      el.classList.add('sel');
+      el.querySelector('input[type=radio]').checked=true;
+      document.getElementById('rld-'+idx).value=val;
+    }
+
+    async function submitReview(orderId,lineCount){
+      const lines=[];
+      for(let i=0;i<lineCount;i++){
+        const dec=document.getElementById('rld-'+i).value;
+        const lineId=document.getElementById('rli-'+i).value;
+        if(!dec){alert('Please select a decision for all lines');return}
+        const entry={lineId,decision:dec};
+        if(dec==='custom') entry.customQty=parseInt(document.getElementById('rcq-'+i).value)||0;
+        lines.push(entry);
+      }
+      const r=await fetch('/api/fulfilment/'+orderId+'/review',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lines})});
+      const d=await r.json();
+      if(d.error){alert('Error: '+d.error);return}
+      closeM();loadOrders();loadReviews();
+    }
+
+    function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+    init();
+  </script>
+</body>
+</html>
