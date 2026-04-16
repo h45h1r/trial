@@ -2107,6 +2107,109 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ── Fallback ──
+
+    // ── Cycle Counts CRUD ──
+    if (method === 'GET' && path === '/cycle-counts') {
+      const { rows } = await pool.query(`
+        SELECT cc.*,
+          coalesce(lc.total_lines, 0)::int as total_lines,
+          coalesce(lc.counted_lines, 0)::int as counted_lines
+        FROM cycle_counts cc
+        LEFT JOIN LATERAL (
+          SELECT count(*)::int as total_lines,
+            count(*) FILTER (WHERE counted_qty IS NOT NULL)::int as counted_lines
+          FROM cycle_count_lines WHERE cycle_count_id = cc.id
+        ) lc ON true
+        ORDER BY cc.created_at DESC
+      `)
+      return writeJson(res, 200, rows)
+    }
+
+    if (method === 'POST' && path === '/cycle-counts') {
+      const body = await readBody(req)
+      const { warehouseCode, scope, scopeFilter, notes, plannedDate } = body
+      if (!warehouseCode) return writeJson(res, 400, { error: 'warehouse_required' })
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+        const year = new Date().getUTCFullYear()
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`cc:${year}`])
+        const { rows: seqRows } = await client.query(
+          `SELECT coalesce(max((substring(count_ref from 'CC-\\d{4}-(\\d+)'))::int), 0) as s FROM cycle_counts WHERE count_ref LIKE $1`, [`CC-${year}-%`])
+        const ref = `CC-${year}-${String((seqRows[0]?.s ?? 0) + 1).padStart(4, '0')}`
+        const { rows: ccRows } = await client.query(
+          `INSERT INTO cycle_counts (count_ref, warehouse_code, scope, scope_filter, notes, planned_date) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+          [ref, warehouseCode, scope || 'full', scopeFilter || null, notes || null, plannedDate || null])
+        const cc = ccRows[0]
+        let sq = `SELECT ws.id as ws_id, ws.product_id, ws.qty_on_hand, ws.location FROM warehouse_stock ws JOIN products p ON p.id = ws.product_id WHERE ws.warehouse = $1`
+        const params = [warehouseCode]
+        if (scope === 'brand' && scopeFilter) { sq += ' AND p.brand = $2'; params.push(scopeFilter) }
+        else if (scope === 'random') { sq += ' ORDER BY random() LIMIT 20' }
+        if (scope !== 'random') sq += ' ORDER BY p.brand, p.name'
+        const { rows: stockRows } = await client.query(sq, params)
+        for (const s of stockRows) {
+          await client.query(`INSERT INTO cycle_count_lines (cycle_count_id, product_id, warehouse_stock_id, expected_qty, location) VALUES ($1,$2,$3,$4,$5)`,
+            [cc.id, s.product_id, s.ws_id, s.qty_on_hand, s.location])
+        }
+        await client.query('COMMIT')
+        return writeJson(res, 201, { ...cc, total_lines: stockRows.length })
+      } catch (e) { await client.query('ROLLBACK'); throw e }
+      finally { client.release() }
+    }
+
+    const ccDetailMatch = path.match(/^\/cycle-counts\/([^/]+)$/)
+    if (method === 'GET' && ccDetailMatch) {
+      const id = ccDetailMatch[1]
+      const { rows: ccRows } = await pool.query('SELECT * FROM cycle_counts WHERE id = $1', [id])
+      if (!ccRows.length) return writeJson(res, 404, { error: 'not_found' })
+      const { rows: lines } = await pool.query(
+        `SELECT ccl.*, p.name as product_name, p.sku, p.brand FROM cycle_count_lines ccl LEFT JOIN products p ON p.id = ccl.product_id WHERE ccl.cycle_count_id = $1 ORDER BY p.brand, p.name`, [id])
+      return writeJson(res, 200, { ...ccRows[0], lines })
+    }
+
+    const ccStartMatch = path.match(/^\/cycle-counts\/([^/]+)\/start$/)
+    if (method === 'PATCH' && ccStartMatch) {
+      const { rows } = await pool.query(
+        `UPDATE cycle_counts SET status = 'in_progress', updated_at = now() WHERE id = $1 AND status = 'planned' RETURNING *`, [ccStartMatch[1]])
+      if (!rows.length) return writeJson(res, 400, { error: 'cannot_start' })
+      return writeJson(res, 200, rows[0])
+    }
+
+    const cclRecordMatch = path.match(/^\/cycle-count-lines\/([^/]+)\/record$/)
+    if (method === 'PATCH' && cclRecordMatch) {
+      const body = await readBody(req)
+      const qty = parseInt(body.countedQty)
+      if (isNaN(qty) || qty < 0) return writeJson(res, 400, { error: 'invalid_qty' })
+      const { rows } = await pool.query(
+        `UPDATE cycle_count_lines SET counted_qty = $1, counted_at = now(), notes = $2 WHERE id = $3 RETURNING *`, [qty, body.notes || null, cclRecordMatch[1]])
+      if (!rows.length) return writeJson(res, 404, { error: 'not_found' })
+      return writeJson(res, 200, rows[0])
+    }
+
+    const ccCompleteMatch = path.match(/^\/cycle-counts\/([^/]+)\/complete$/)
+    if (method === 'PATCH' && ccCompleteMatch) {
+      const id = ccCompleteMatch[1]
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+        const { rows: ccRows } = await client.query(
+          `SELECT * FROM cycle_counts WHERE id = $1 AND status = 'in_progress' FOR UPDATE`, [id])
+        if (!ccRows.length) { await client.query('ROLLBACK'); return writeJson(res, 400, { error: 'cannot_complete' }) }
+        const cc = ccRows[0]
+        const { rows: lines } = await client.query(
+          `SELECT * FROM cycle_count_lines WHERE cycle_count_id = $1 AND counted_qty IS NOT NULL AND variance != 0`, [id])
+        let adjustments = 0
+        for (const line of lines) {
+          await client.query(`UPDATE warehouse_stock SET qty_on_hand = $1 WHERE id = $2`, [line.counted_qty, line.warehouse_stock_id])
+          await auditLog(client, 'stock_adjusted', 'cycle_count', cc.id, cc.warehouse_code, line.product_id, line.variance, line.counted_qty, `Cycle count ${cc.count_ref}: adjusted by ${line.variance}`)
+          adjustments++
+        }
+        await client.query(`UPDATE cycle_counts SET status = 'completed', completed_at = now(), updated_at = now() WHERE id = $1`, [id])
+        await client.query('COMMIT')
+        return writeJson(res, 200, { status: 'completed', adjustments })
+      } catch (e) { await client.query('ROLLBACK'); throw e }
+      finally { client.release() }
+    }
     writeJson(res, 404, { error: 'not_found' })
   } catch (err) {
     console.error('Request error:', err)

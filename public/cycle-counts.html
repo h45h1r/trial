@@ -175,7 +175,7 @@
         <div class="field" id="sf-wrap" style="display:none"><label id="sf-label">Filter</label><input type="text" id="sf" placeholder="" /></div>
         <div class="field"><label>Planned Date</label><input type="date" id="nd" /></div>
         <div class="field"><label>Notes</label><input type="text" id="nn" placeholder="Optional notes" /></div>
-        <div class="actions"><button class="btn btn-ghost" onclick="closeM()">Cancel</button><button class="btn btn-dark" onclick="createCount()">Create</button></div>
+        <div class="actions"><button class="btn btn-ghost" onclick="closeM()">Cancel</button><button class="btn btn-dark" id="cc-create-btn" onclick="createCount()">Create</button></div>
       </div></div>`;
     }
 
@@ -189,7 +189,7 @@
       else{wrap.style.display='none'}
     }
 
-    async function createCount(){
+    let ccCreating=false;async function createCount(){if(ccCreating)return;ccCreating=true;const btn=document.getElementById("cc-create-btn");btn.textContent="Creating...";btn.style.opacity="0.5";
       const body={warehouseCode:document.getElementById('nw').value,scope:document.getElementById('ns').value};
       const sf=document.getElementById('sf')?.value?.trim();
       if(sf)body.scopeFilter=sf;
@@ -198,7 +198,7 @@
       const nn=document.getElementById('nn').value.trim();
       if(nn)body.notes=nn;
       const r=await fetch('/api/cycle-counts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
-      closeM();await loadList();loadDetail(r.id);
+      ccCreating=false;closeM();await loadList();loadDetail(r.id);
     }
 
     function closeM(e){if(e&&e.target!==e.currentTarget)return;document.getElementById('mr').innerHTML=''}
